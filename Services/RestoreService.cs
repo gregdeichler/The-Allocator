@@ -142,6 +142,8 @@ public sealed class RestoreService
             logger.Add($"Restore package: {session.RestorePackagePath}");
             logger.Add($"Target profile path: {targetProfilePath}");
             logger.Add($"Collision mode: {session.RestoreCollisionMode}");
+            logger.Add($"Source operating system: {session.RestoreManifest.SourceOperatingSystem} ({session.RestoreManifest.SourceOperatingSystemVersion})");
+            logger.Add($"Target operating system: {MachineInfoService.GetOperatingSystemDisplayName()} ({MachineInfoService.GetOperatingSystemVersionValue()})");
             ValidateCrossUserOverwrite(session, logger);
             ValidateTargetProfileIsNotCurrentSignedInProfile(targetProfilePath, logger);
 
@@ -331,9 +333,14 @@ public sealed class RestoreService
             logger.Add($"Skipped sensitive profile state during restore: {skippedPath}");
         }
 
-        if (IsSameUserOverwriteRestore(session))
+        if (IsSameUserOverwriteRestore(session) && !IsLegacySourceRestore(session))
         {
             logger.Add("Same-user overwrite restore detected. Profile registry hives will be restored.");
+        }
+
+        if (IsLegacySourceRestore(session))
+        {
+            logger.Add("Legacy source operating system detected. Restore will skip profile hives and Windows shell state for compatibility.");
         }
 
         var extractCode = await SevenZipService.ExtractArchiveAsync(
@@ -341,6 +348,7 @@ public sealed class RestoreService
             targetProfilePath,
             progress,
             cancellationToken,
+            GetLegacyRestoreExcludePatterns(session),
             includePatterns);
 
         if (!IsAcceptableSevenZipExitCode(extractCode))
@@ -796,9 +804,14 @@ public sealed class RestoreService
             return false;
         }
 
+        if (ShouldSkipLegacyShellState(relativePath, session))
+        {
+            return false;
+        }
+
         if (IsProfileHivePath(relativePath))
         {
-            return IsSameUserOverwriteRestore(session);
+            return IsSameUserOverwriteRestore(session) && !IsLegacySourceRestore(session);
         }
 
         return true;
@@ -821,6 +834,42 @@ public sealed class RestoreService
                !string.IsNullOrWhiteSpace(sourceUser) &&
                !string.IsNullOrWhiteSpace(targetUser) &&
                string.Equals(sourceUser, targetUser, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsLegacySourceRestore(AllocatorSession session)
+    {
+        var versionValue = session.RestoreManifest?.SourceOperatingSystemVersion;
+        if (Version.TryParse(versionValue, out var parsedVersion))
+        {
+            return parsedVersion.Major < 10;
+        }
+
+        var sourceOperatingSystem = session.RestoreManifest?.SourceOperatingSystem ?? string.Empty;
+        return sourceOperatingSystem.Contains("Windows 7", StringComparison.OrdinalIgnoreCase) ||
+               sourceOperatingSystem.Contains("Windows 8", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldSkipLegacyShellState(string relativePath, AllocatorSession session)
+    {
+        if (!IsLegacySourceRestore(session))
+        {
+            return false;
+        }
+
+        return relativePath.StartsWith(Path.Combine("AppData", "Local", "Microsoft", "Windows"), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string[] GetLegacyRestoreExcludePatterns(AllocatorSession session)
+    {
+        if (!IsLegacySourceRestore(session))
+        {
+            return [];
+        }
+
+        return
+        [
+            Path.Combine("AppData", "Local", "Microsoft", "Windows")
+        ];
     }
 
     private static string? GetComparableAccountName(string? accountName)

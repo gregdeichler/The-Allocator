@@ -6,6 +6,38 @@ namespace TheAllocator.Services;
 
 public sealed class MachineInfoService
 {
+    public static string GetOperatingSystemDisplayName()
+    {
+        try
+        {
+            using var currentVersionKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            if (currentVersionKey is not null)
+            {
+                var productName = currentVersionKey.GetValue("ProductName")?.ToString()?.Trim();
+                var displayVersion = currentVersionKey.GetValue("DisplayVersion")?.ToString()?.Trim();
+                var releaseId = currentVersionKey.GetValue("ReleaseId")?.ToString()?.Trim();
+
+                var versionLabel = !string.IsNullOrWhiteSpace(displayVersion)
+                    ? displayVersion
+                    : releaseId;
+
+                if (!string.IsNullOrWhiteSpace(productName))
+                {
+                    return string.IsNullOrWhiteSpace(versionLabel)
+                        ? productName
+                        : $"{productName} {versionLabel}";
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return Environment.OSVersion.VersionString;
+    }
+
+    public static string GetOperatingSystemVersionValue() => Environment.OSVersion.Version.ToString();
+
     public MachineInfoSnapshot GetSnapshot()
     {
         var deviceName = Environment.MachineName;

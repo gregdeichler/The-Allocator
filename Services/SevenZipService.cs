@@ -132,6 +132,7 @@ public sealed class SevenZipService
         string outputDirectory,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default,
+        string[]? excludePatterns = null,
         params string[] includePatterns)
     {
         Directory.CreateDirectory(outputDirectory);
@@ -156,6 +157,11 @@ public sealed class SevenZipService
         foreach (var pattern in includePatterns.Where(pattern => !string.IsNullOrWhiteSpace(pattern)))
         {
             startInfo.ArgumentList.Add(pattern);
+        }
+
+        foreach (var excludePattern in (excludePatterns ?? []).Where(pattern => !string.IsNullOrWhiteSpace(pattern)))
+        {
+            startInfo.ArgumentList.Add($"-xr!{excludePattern}");
         }
 
         using var process = new Process { StartInfo = startInfo };

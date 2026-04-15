@@ -10,6 +10,10 @@ public sealed class BackupManifest
 
     public string SourceComputerName { get; set; } = string.Empty;
 
+    public string SourceOperatingSystem { get; set; } = string.Empty;
+
+    public string SourceOperatingSystemVersion { get; set; } = string.Empty;
+
     public string UserName { get; set; } = string.Empty;
 
     public string DisplayName { get; set; } = string.Empty;

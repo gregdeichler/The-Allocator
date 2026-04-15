@@ -112,6 +112,8 @@ public sealed class BackupService
                 AppVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0.0",
                 CreatedAt = DateTime.Now,
                 SourceComputerName = Environment.MachineName,
+                SourceOperatingSystem = MachineInfoService.GetOperatingSystemDisplayName(),
+                SourceOperatingSystemVersion = MachineInfoService.GetOperatingSystemVersionValue(),
                 UserName = profile.UserName,
                 DisplayName = profile.DisplayName,
                 Sid = profile.Sid,

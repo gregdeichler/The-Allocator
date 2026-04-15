@@ -7,10 +7,10 @@
     <RootNamespace>TheAllocator</RootNamespace>
     <Product>The Allocator</Product>
     <Company>Vassar College</Company>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
-    <InformationalVersion>1.0.0-the-allocator</InformationalVersion>
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
+    <InformationalVersion>1.0.1-the-allocator</InformationalVersion>
     <Description>Internal Vassar College user backup and restore utility for Windows profile migration.</Description>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
