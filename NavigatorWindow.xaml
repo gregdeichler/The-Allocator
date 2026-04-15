@@ -1,0 +1,189 @@
+<Window x:Class="TheAllocator.NavigatorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="The Allocator"
+        Height="820"
+        Width="1280"
+        MinHeight="700"
+        MinWidth="1024"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized">
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#FFF8EF" Offset="0" />
+                <GradientStop Color="#F2D4D7" Offset="1" />
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <Grid Margin="28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="18" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    CornerRadius="24"
+                    Background="{StaticResource AllocatorWarmWhiteBrush}"
+                    BorderBrush="{StaticResource AllocatorBorderBrush}"
+                    BorderThickness="1">
+                <Grid Margin="26,20,26,22">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="340" />
+                        </Grid.ColumnDefinitions>
+
+                        <Grid MaxWidth="760"
+                              HorizontalAlignment="Left">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="4" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="10" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid HorizontalAlignment="Left">
+                                <Image x:Name="WordmarkImage"
+                                       Width="540"
+                                       Height="84"
+                                       HorizontalAlignment="Left"
+                                       Stretch="Uniform" />
+                                <TextBlock x:Name="WordmarkFallbackText"
+                                           FontSize="46"
+                                           FontFamily="Georgia"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource AllocatorBurgundyBrush}"
+                                           HorizontalAlignment="Left"
+                                           VerticalAlignment="Center"
+                                           Text="VASSAR"
+                                           Visibility="Collapsed" />
+                            </Grid>
+
+                            <Border Grid.Row="2"
+                                    Width="540"
+                                    Height="3"
+                                    HorizontalAlignment="Left"
+                                    CornerRadius="2"
+                                    Background="{StaticResource AllocatorGoldBrush}" />
+
+                            <StackPanel Grid.Row="4">
+                                <TextBlock FontSize="32"
+                                           FontWeight="Bold"
+                                           Text="The Allocator" />
+                                <TextBlock Margin="0,6,0,0"
+                                           FontSize="14"
+                                           Foreground="{StaticResource AllocatorMutedBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Profile backup and restore for Vassar device migrations." />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Grid.Column="2"
+                                Padding="20,16,20,16"
+                                CornerRadius="18"
+                                Background="#FFF6F1"
+                                BorderBrush="{StaticResource AllocatorBorderBrush}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource AllocatorMutedBrush}"
+                                           Text="This Computer" />
+                                <TextBlock Grid.Row="2"
+                                           x:Name="MachineNameText"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource AllocatorBurgundyBrush}"
+                                           Text="Device Name" />
+                                <TextBlock Grid.Row="4"
+                                           x:Name="MachineModelText"
+                                           FontSize="13"
+                                           Foreground="{StaticResource AllocatorMutedBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="Model" />
+                                <TextBlock Grid.Row="6"
+                                           x:Name="MachineSpecsText"
+                                           FontSize="13"
+                                           Foreground="{StaticResource AllocatorMutedBrush}"
+                                           TextWrapping="Wrap"
+                                           Text="RAM and storage" />
+                            </Grid>
+                        </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="340" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="14" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0">
+                            <TextBlock x:Name="WorkflowTitleText"
+                                       FontSize="22"
+                                       FontWeight="Bold"
+                                       Text="Workflow" />
+                            <TextBlock x:Name="WorkflowSummaryText"
+                                       Margin="0,10,0,0"
+                                       FontSize="15"
+                                       Foreground="{StaticResource AllocatorMutedBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Choose a branch to begin." />
+                        </StackPanel>
+
+                        <ScrollViewer Grid.Row="2"
+                                      x:Name="WorkflowStepsScrollViewer"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      CanContentScroll="False"
+                                      Padding="0,0,6,0">
+                            <StackPanel x:Name="WorkflowStepsPanel" />
+                        </ScrollViewer>
+
+                        <Button Grid.Row="4"
+                                x:Name="BackToStartButton"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="GoToStartPage_Click"
+                                Content="Back To Start"
+                                Visibility="Collapsed" />
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2"
+                        Style="{StaticResource CardBorderStyle}">
+                    <Frame x:Name="ShellFrame"
+                           NavigationUIVisibility="Hidden" />
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

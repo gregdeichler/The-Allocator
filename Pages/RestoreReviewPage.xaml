@@ -1,0 +1,70 @@
+<Page x:Class="TheAllocator.Pages.RestoreReviewPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="Transparent">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock FontSize="30" FontWeight="Bold" Text="Review and Start Restore" />
+            <TextBlock Margin="0,10,0,0"
+                       FontSize="16"
+                       Foreground="{StaticResource AllocatorMutedBrush}"
+                       TextWrapping="Wrap"
+                       Text="Confirm the backup file, the target sign-in account, and how the app should behave if an existing profile is already present." />
+        </StackPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.1*" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="0.9*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock FontSize="20" FontWeight="Bold" Text="Restore Summary" />
+                    <TextBlock x:Name="SummaryText"
+                               Margin="0,16,0,0"
+                               FontSize="15"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock FontSize="20" FontWeight="Bold" Text="Existing Profile Behavior" />
+                    <RadioButton x:Name="MergeRadioButton"
+                                 Margin="0,18,0,0"
+                                 Content="Merge into an existing profile if present"
+                                 Checked="CollisionMode_Checked" />
+                    <RadioButton x:Name="OverwriteRadioButton"
+                                 Margin="0,10,0,0"
+                                 Content="Overwrite an existing profile if present"
+                                 Checked="CollisionMode_Checked" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Style="{StaticResource SecondaryButtonStyle}" Click="Back_Click" Content="Back" />
+            <Button x:Name="BeginButton"
+                    Grid.Column="2"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Click="Begin_Click"
+                    Content="Begin Restore" />
+        </Grid>
+    </Grid>
+</Page>

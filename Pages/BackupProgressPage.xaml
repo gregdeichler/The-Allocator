@@ -1,0 +1,67 @@
+<Page x:Class="TheAllocator.Pages.BackupProgressPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Loaded="Page_Loaded"
+      Background="Transparent">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock FontSize="30" FontWeight="Bold" Text="Backup Progress" />
+            <TextBlock Margin="0,10,0,0"
+                       FontSize="16"
+                       Foreground="{StaticResource AllocatorMutedBrush}"
+                       TextWrapping="Wrap"
+                       Text="The app is now creating the backup package, metadata files, and printer export in the selected destination folder." />
+        </StackPanel>
+
+        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="16" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock x:Name="StatusTitleText" FontSize="20" FontWeight="Bold" Text="Running Backup" />
+                <ProgressBar Grid.Row="1"
+                             x:Name="BackupProgressBar"
+                             Margin="0,16,0,0"
+                             Height="18"
+                             Minimum="0"
+                             Maximum="100"
+                             IsIndeterminate="True"
+                             Foreground="{StaticResource AllocatorBurgundyBrush}" />
+                <ScrollViewer Grid.Row="3"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="True">
+                    <TextBlock x:Name="ProgressText"
+                               FontSize="15"
+                               TextWrapping="Wrap" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="1"
+                    x:Name="FinishButton"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Click="Finish_Click"
+                    Content="Continue To Complete"
+                    IsEnabled="False" />
+        </Grid>
+    </Grid>
+</Page>

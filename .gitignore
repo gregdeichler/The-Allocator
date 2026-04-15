@@ -1,0 +1,25 @@
+# Build output
+bin/
+obj/
+release/
+packaging/output/
+
+# Local tooling caches
+.dotnet-cli/
+.nuget/
+
+# User/editor files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs and temp files
+*.log
+*.tmp
+*.cache
+
+# OS files
+Thumbs.db
+Desktop.ini
