@@ -8,6 +8,12 @@ namespace TheAllocator.Services;
 
 public sealed class BackupService
 {
+    private static readonly EnumerationOptions ProfileEnumerationOptions = new()
+    {
+        IgnoreInaccessible = true,
+        AttributesToSkip = FileAttributes.ReparsePoint
+    };
+
     private static readonly string[] ExcludedDirectoryNames =
     [
         "Temp",
@@ -244,35 +250,39 @@ public sealed class BackupService
     {
         var fileCount = 0;
 
-        foreach (var filePath in Directory.EnumerateFiles(sourcePath))
+        try
         {
-            var fileName = Path.GetFileName(filePath);
-            if (ShouldExcludeFile(fileName))
+            foreach (var filePath in Directory.EnumerateFiles(sourcePath, "*", ProfileEnumerationOptions))
             {
-                excludedPaths.Add(filePath);
-                continue;
-            }
+                var fileName = Path.GetFileName(filePath);
+                if (ShouldExcludeFile(fileName))
+                {
+                    excludedPaths.Add(filePath);
+                    continue;
+                }
 
-            try
-            {
                 fileCount++;
             }
-            catch (Exception ex)
+
+            foreach (var childDirectory in Directory.EnumerateDirectories(sourcePath, "*", ProfileEnumerationOptions))
             {
-                messages.Add($"Skipped file count for {filePath}: {ex.Message}");
+                var directoryName = Path.GetFileName(childDirectory);
+                if (ShouldExcludeDirectory(childDirectory, directoryName))
+                {
+                    excludedPaths.Add(childDirectory);
+                    continue;
+                }
+
+                fileCount += CountIncludedFiles(childDirectory, excludedPaths, messages);
             }
         }
-
-        foreach (var childDirectory in Directory.EnumerateDirectories(sourcePath))
+        catch (UnauthorizedAccessException)
         {
-            var directoryName = Path.GetFileName(childDirectory);
-            if (ShouldExcludeDirectory(childDirectory, directoryName))
-            {
-                excludedPaths.Add(childDirectory);
-                continue;
-            }
-
-            fileCount += CountIncludedFiles(childDirectory, excludedPaths, messages);
+            messages.Add($"Skipped inaccessible folder during backup scan: {sourcePath}");
+        }
+        catch (IOException ex)
+        {
+            messages.Add($"Skipped unreadable folder during backup scan: {sourcePath} ({ex.Message})");
         }
 
         return fileCount;
@@ -287,30 +297,41 @@ public sealed class BackupService
         var includedPaths = new List<string>();
         copiedFileCount = 0;
 
-        foreach (var filePath in Directory.EnumerateFiles(profilePath))
+        try
         {
-            var fileName = Path.GetFileName(filePath);
-            if (ShouldExcludeFile(fileName))
+            foreach (var filePath in Directory.EnumerateFiles(profilePath, "*", ProfileEnumerationOptions))
             {
-                excludedPaths.Add(filePath);
-                continue;
+                var fileName = Path.GetFileName(filePath);
+                if (ShouldExcludeFile(fileName))
+                {
+                    excludedPaths.Add(filePath);
+                    continue;
+                }
+
+                includedPaths.Add(fileName);
+                copiedFileCount++;
             }
 
-            includedPaths.Add(fileName);
-            copiedFileCount++;
+            foreach (var directoryPath in Directory.EnumerateDirectories(profilePath, "*", ProfileEnumerationOptions))
+            {
+                var directoryName = Path.GetFileName(directoryPath);
+                if (ShouldExcludeDirectory(directoryPath, directoryName))
+                {
+                    excludedPaths.Add(directoryPath);
+                    continue;
+                }
+
+                includedPaths.Add(directoryName);
+                copiedFileCount += CountIncludedFiles(directoryPath, excludedPaths, messages);
+            }
         }
-
-        foreach (var directoryPath in Directory.EnumerateDirectories(profilePath))
+        catch (UnauthorizedAccessException)
         {
-            var directoryName = Path.GetFileName(directoryPath);
-            if (ShouldExcludeDirectory(directoryPath, directoryName))
-            {
-                excludedPaths.Add(directoryPath);
-                continue;
-            }
-
-            includedPaths.Add(directoryName);
-            copiedFileCount += CountIncludedFiles(directoryPath, excludedPaths, messages);
+            messages.Add($"Skipped inaccessible content while scanning {profilePath}.");
+        }
+        catch (IOException ex)
+        {
+            messages.Add($"Skipped unreadable content while scanning {profilePath}: {ex.Message}");
         }
 
         return includedPaths

@@ -367,6 +367,12 @@ public sealed class RestoreService
     private static int CountRestoredFiles(string targetProfilePath, IEnumerable<string> includedPaths, RestoreLogger logger)
     {
         var restoredFiles = 0;
+        var enumerationOptions = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
 
         foreach (var relativePath in includedPaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -381,8 +387,11 @@ public sealed class RestoreService
 
                 if (Directory.Exists(fullPath))
                 {
-                    restoredFiles += Directory.EnumerateFiles(fullPath, "*", SearchOption.AllDirectories).Count();
+                    restoredFiles += Directory.EnumerateFiles(fullPath, "*", enumerationOptions).Count();
                 }
+            }
+            catch (UnauthorizedAccessException)
+            {
             }
             catch (Exception ex)
             {
@@ -736,12 +745,20 @@ public sealed class RestoreService
 
         if (!string.IsNullOrWhiteSpace(stdout))
         {
-            logger.Add(stdout.Trim());
+            var filteredStdout = FilterProcessOutput(startInfo.FileName, stdout).Trim();
+            if (!string.IsNullOrWhiteSpace(filteredStdout))
+            {
+                logger.Add(filteredStdout);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(stderr))
         {
-            logger.Add(stderr.Trim());
+            var filteredStderr = FilterProcessOutput(startInfo.FileName, stderr).Trim();
+            if (!string.IsNullOrWhiteSpace(filteredStderr))
+            {
+                logger.Add(filteredStderr);
+            }
         }
 
         return process.ExitCode == 0;
@@ -783,6 +800,53 @@ public sealed class RestoreService
     }
 
     private static string EscapePowerShell(string value) => value.Replace("'", "''", StringComparison.Ordinal);
+
+    private static string FilterProcessOutput(string fileName, string output)
+    {
+        if (!fileName.Equals("icacls.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            return output;
+        }
+
+        var filteredLines = output
+            .Split(["\r\n", "\n"], StringSplitOptions.None)
+            .Where(line => !ShouldSuppressIcaclsLine(line))
+            .ToArray();
+
+        return string.Join(Environment.NewLine, filteredLines).Trim();
+    }
+
+    private static bool ShouldSuppressIcaclsLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return true;
+        }
+
+        if (!line.Contains("Access is denied.", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return line.Contains(@"\AppData\Local\Application Data\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\AppData\Local\History\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\AppData\Local\Microsoft\Windows\INetCache\Content.IE5\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\AppData\Local\Microsoft\Windows\Temporary Internet Files\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\AppData\Local\Temporary Internet Files\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Application Data\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Cookies\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Documents\My Music\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Documents\My Pictures\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Documents\My Videos\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Local Settings\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\My Documents\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\NetHood\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\PrintHood\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Recent\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\SendTo\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Start Menu\", StringComparison.OrdinalIgnoreCase) ||
+               line.Contains(@"\Templates\", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string GetRestoreLogFileName(string? userName)
     {
