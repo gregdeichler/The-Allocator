@@ -88,6 +88,19 @@ public sealed class BackupService
         var metadataPath = Path.Combine(backupRoot, session.BackupMetadataFileName);
         var printersPath = Path.Combine(backupRoot, session.BackupPrintersFileName);
         var logPath = Path.Combine(backupRoot, session.BackupLogFileName);
+        var telemetryLogPath = Path.Combine(backupRoot, "logs", $"{profile.UserName}-backup.telemetry.jsonl");
+        var telemetry = new TelemetryService(
+            TelemetryService.GetTelemetryRootForBackup(session.BackupDestinationFolder),
+            telemetryLogPath,
+            new TelemetryContext
+            {
+                JobId = string.IsNullOrWhiteSpace(session.BackupJobId) ? Guid.NewGuid().ToString("N") : session.BackupJobId,
+                Operation = "backup",
+                UserProfile = profile.UserName,
+                SourceComputer = Environment.MachineName,
+                BackupPath = archivePath,
+                SourceOperatingSystem = MachineInfoService.GetOperatingSystemDisplayName()
+            });
         var metadataTempRoot = Path.Combine(Path.GetTempPath(), $"allocator-backup-meta-{Guid.NewGuid():N}");
         var tempMetadataPath = Path.Combine(metadataTempRoot, session.BackupMetadataFileName);
         var tempPrintersPath = Path.Combine(metadataTempRoot, session.BackupPrintersFileName);
@@ -95,16 +108,22 @@ public sealed class BackupService
         var includedPaths = new List<string>();
         var excludedPaths = new List<string>();
         var copiedFileCount = 0;
+        var warningCount = 0;
+        var errorCount = 0;
+        var filesSkipped = 0;
+        var currentPhase = "prepare";
 
         try
         {
             Directory.CreateDirectory(backupRoot);
             Directory.CreateDirectory(metadataTempRoot);
+            await telemetry.FlushAsync(cancellationToken);
 
             progressProxy.Report($"Preparing backup for {profile.DisplayName}...");
             messages.Add($"Backup started at {DateTime.Now:u}");
+            telemetry.WriteInfo("Backup started.", phase: currentPhase, status: "started", path: archivePath);
 
-            includedPaths.AddRange(GetIncludedRelativePaths(profile.ProfilePath, excludedPaths, messages, out copiedFileCount));
+            includedPaths.AddRange(GetIncludedRelativePaths(profile.ProfilePath, excludedPaths, messages, telemetry, out copiedFileCount, out filesSkipped));
 
             var printerDetails = PrinterDiscoveryService.GetPrinterDetails(session.SelectedBackupPrinters);
             var printersJson = JsonSerializer.Serialize(printerDetails, JsonOptions);
@@ -112,6 +131,7 @@ public sealed class BackupService
             await File.WriteAllTextAsync(tempPrintersPath, printersJson, cancellationToken);
 
             messages.Add($"Captured {printerDetails.Count} selected printers.");
+            telemetry.WriteInfo($"Captured {printerDetails.Count} selected printers.", phase: currentPhase, status: "running", filesCopied: copiedFileCount, filesSkipped: filesSkipped);
 
             var manifest = new BackupManifest
             {
@@ -136,7 +156,9 @@ public sealed class BackupService
 
             await File.WriteAllTextAsync(tempMetadataPath, JsonSerializer.Serialize(manifest, JsonOptions), cancellationToken);
 
+            currentPhase = "archive";
             progressProxy.Report("Phase 1 of 3: Creating archive...");
+            telemetry.WriteInfo("Creating backup archive.", phase: currentPhase, status: "running", path: archivePath);
             var archiveExitCode = await SevenZipService.CreateArchiveFromPathsAsync(
                 archivePath,
                 profile.ProfilePath,
@@ -146,6 +168,9 @@ public sealed class BackupService
                 cancellationToken);
             if (!IsAcceptableSevenZipExitCode(archiveExitCode))
             {
+                errorCount++;
+                telemetry.WriteError($"7-Zip failed during archive creation with exit code {archiveExitCode}.", phase: currentPhase, status: "failed", errorCode: archiveExitCode.ToString(), path: archivePath);
+                await telemetry.FlushAsync(cancellationToken);
                 await File.WriteAllLinesAsync(logPath, messages, cancellationToken);
                 return new BackupResult
                 {
@@ -156,8 +181,15 @@ public sealed class BackupService
             }
 
             AddSevenZipExitCodeMessage(messages, archiveExitCode, "archive creation");
+            if (archiveExitCode == 1)
+            {
+                warningCount++;
+                telemetry.WriteWarning("7-Zip reported warnings during archive creation, but the backup continued.", phase: currentPhase, status: "warning", errorCode: archiveExitCode.ToString(), path: archivePath);
+            }
 
+            currentPhase = "details";
             progressProxy.Report("Phase 2 of 3: Adding backup details...");
+            telemetry.WriteInfo("Adding backup details to the archive.", phase: currentPhase, status: "running", path: archivePath);
             var metadataArchiveExitCode = await SevenZipService.AddFilesToArchiveAsync(
                 archivePath,
                 metadataTempRoot,
@@ -166,6 +198,9 @@ public sealed class BackupService
                 cancellationToken);
             if (!IsAcceptableSevenZipExitCode(metadataArchiveExitCode))
             {
+                errorCount++;
+                telemetry.WriteError($"7-Zip could not add backup details to the archive. Exit code {metadataArchiveExitCode}.", phase: currentPhase, status: "failed", errorCode: metadataArchiveExitCode.ToString(), path: archivePath);
+                await telemetry.FlushAsync(cancellationToken);
                 await File.WriteAllLinesAsync(logPath, messages, cancellationToken);
                 return new BackupResult
                 {
@@ -176,12 +211,19 @@ public sealed class BackupService
             }
 
             AddSevenZipExitCodeMessage(messages, metadataArchiveExitCode, "adding backup details");
+            if (metadataArchiveExitCode == 1)
+            {
+                warningCount++;
+                telemetry.WriteWarning("7-Zip reported warnings while adding backup details, but the backup continued.", phase: currentPhase, status: "warning", errorCode: metadataArchiveExitCode.ToString(), path: archivePath);
+            }
 
             manifest.ArchiveSizeBytes = new FileInfo(archivePath).Length;
             await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(manifest, JsonOptions), cancellationToken);
             await File.WriteAllTextAsync(tempMetadataPath, JsonSerializer.Serialize(manifest, JsonOptions), cancellationToken);
 
+            currentPhase = "finalize";
             progressProxy.Report("Phase 3 of 3: Finalizing package...");
+            telemetry.WriteInfo("Finalizing the backup package.", phase: currentPhase, status: "running", path: archivePath);
             var manifestUpdateExitCode = await SevenZipService.AddFilesToArchiveAsync(
                 archivePath,
                 metadataTempRoot,
@@ -190,6 +232,9 @@ public sealed class BackupService
                 cancellationToken);
             if (!IsAcceptableSevenZipExitCode(manifestUpdateExitCode))
             {
+                errorCount++;
+                telemetry.WriteError($"7-Zip could not update the backup metadata inside the archive. Exit code {manifestUpdateExitCode}.", phase: currentPhase, status: "failed", errorCode: manifestUpdateExitCode.ToString(), path: archivePath);
+                await telemetry.FlushAsync(cancellationToken);
                 await File.WriteAllLinesAsync(logPath, messages, cancellationToken);
                 return new BackupResult
                 {
@@ -200,11 +245,28 @@ public sealed class BackupService
             }
 
             AddSevenZipExitCodeMessage(messages, manifestUpdateExitCode, "updating backup metadata");
+            if (manifestUpdateExitCode == 1)
+            {
+                warningCount++;
+                telemetry.WriteWarning("7-Zip reported warnings while finalizing backup metadata, but the backup continued.", phase: currentPhase, status: "warning", errorCode: manifestUpdateExitCode.ToString(), path: archivePath);
+            }
 
             messages.Add($"Archive created at {archivePath}");
             messages.Add($"Archive size: {SizeFormattingService.ToReadableSize(manifest.ArchiveSizeBytes)}");
             messages.Add($"Archived files: {copiedFileCount:N0}");
             messages.Add("The archive was created directly from the source profile without duplicating the full profile onto the backup drive.");
+            telemetry.WriteInfo(
+                "Backup completed successfully.",
+                phase: "complete",
+                status: "success",
+                path: archivePath,
+                durationSeconds: session.BackupStartedAt.HasValue ? (DateTime.Now - session.BackupStartedAt.Value).TotalSeconds : null,
+                filesCopied: copiedFileCount,
+                filesSkipped: filesSkipped,
+                bytesCopied: manifest.ArchiveSizeBytes,
+                warningCount: warningCount,
+                errorCount: errorCount);
+            await telemetry.FlushAsync(cancellationToken);
 
             await File.WriteAllLinesAsync(logPath, messages, cancellationToken);
 
@@ -223,8 +285,16 @@ public sealed class BackupService
         catch (Exception ex)
         {
             messages.Add($"Backup failed: {ex.Message}");
+            errorCount++;
+            telemetry.WriteError(
+                $"Backup failed: {ex.Message}",
+                phase: currentPhase,
+                status: "failed",
+                exception: ex,
+                path: archivePath);
             try
             {
+                await telemetry.FlushAsync(cancellationToken);
                 await File.WriteAllLinesAsync(logPath, messages, cancellationToken);
             }
             catch
@@ -246,7 +316,9 @@ public sealed class BackupService
     private static int CountIncludedFiles(
         string sourcePath,
         List<string> excludedPaths,
-        List<string> messages)
+        List<string> messages,
+        TelemetryService telemetry,
+        ref int filesSkipped)
     {
         var fileCount = 0;
 
@@ -258,6 +330,7 @@ public sealed class BackupService
                 if (ShouldExcludeFile(fileName))
                 {
                     excludedPaths.Add(filePath);
+                    filesSkipped++;
                     continue;
                 }
 
@@ -270,19 +343,24 @@ public sealed class BackupService
                 if (ShouldExcludeDirectory(childDirectory, directoryName))
                 {
                     excludedPaths.Add(childDirectory);
+                    filesSkipped++;
                     continue;
                 }
 
-                fileCount += CountIncludedFiles(childDirectory, excludedPaths, messages);
+                fileCount += CountIncludedFiles(childDirectory, excludedPaths, messages, telemetry, ref filesSkipped);
             }
         }
         catch (UnauthorizedAccessException)
         {
             messages.Add($"Skipped inaccessible folder during backup scan: {sourcePath}");
+            telemetry.WriteWarning("Skipped inaccessible folder during backup scan.", phase: "prepare", status: "warning", path: sourcePath);
+            filesSkipped++;
         }
         catch (IOException ex)
         {
             messages.Add($"Skipped unreadable folder during backup scan: {sourcePath} ({ex.Message})");
+            telemetry.WriteWarning($"Skipped unreadable folder during backup scan: {ex.Message}", phase: "prepare", status: "warning", path: sourcePath);
+            filesSkipped++;
         }
 
         return fileCount;
@@ -292,10 +370,13 @@ public sealed class BackupService
         string profilePath,
         List<string> excludedPaths,
         List<string> messages,
-        out int copiedFileCount)
+        TelemetryService telemetry,
+        out int copiedFileCount,
+        out int filesSkipped)
     {
         var includedPaths = new List<string>();
         copiedFileCount = 0;
+        filesSkipped = 0;
 
         try
         {
@@ -305,6 +386,7 @@ public sealed class BackupService
                 if (ShouldExcludeFile(fileName))
                 {
                     excludedPaths.Add(filePath);
+                    filesSkipped++;
                     continue;
                 }
 
@@ -318,20 +400,25 @@ public sealed class BackupService
                 if (ShouldExcludeDirectory(directoryPath, directoryName))
                 {
                     excludedPaths.Add(directoryPath);
+                    filesSkipped++;
                     continue;
                 }
 
                 includedPaths.Add(directoryName);
-                copiedFileCount += CountIncludedFiles(directoryPath, excludedPaths, messages);
+                copiedFileCount += CountIncludedFiles(directoryPath, excludedPaths, messages, telemetry, ref filesSkipped);
             }
         }
         catch (UnauthorizedAccessException)
         {
             messages.Add($"Skipped inaccessible content while scanning {profilePath}.");
+            telemetry.WriteWarning("Skipped inaccessible content while scanning the profile root.", phase: "prepare", status: "warning", path: profilePath);
+            filesSkipped++;
         }
         catch (IOException ex)
         {
             messages.Add($"Skipped unreadable content while scanning {profilePath}: {ex.Message}");
+            telemetry.WriteWarning($"Skipped unreadable content while scanning the profile root: {ex.Message}", phase: "prepare", status: "warning", path: profilePath);
+            filesSkipped++;
         }
 
         return includedPaths

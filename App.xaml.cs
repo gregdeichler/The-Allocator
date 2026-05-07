@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Windows;
+using TheAllocator.Services;
 
 namespace TheAllocator;
 
@@ -16,11 +17,20 @@ public partial class App : System.Windows.Application
             ExecutionState.Continuous |
             ExecutionState.SystemRequired |
             ExecutionState.DisplayRequired);
+        _ = TelemetryService.FlushWellKnownPendingBatchesAsync();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         SetThreadExecutionState(ExecutionState.Continuous);
+        try
+        {
+            TelemetryService.FlushWellKnownPendingBatchesAsync().GetAwaiter().GetResult();
+        }
+        catch
+        {
+        }
+
         base.OnExit(e);
     }
 

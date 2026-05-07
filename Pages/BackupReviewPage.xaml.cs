@@ -51,6 +51,7 @@ public partial class BackupReviewPage : Page
         _shell.Session.BackupPackagePath = Path.Combine(GetBackupOutputFolder(), _shell.Session.BackupPackageName);
         _shell.Session.BackupStartedAt = DateTime.Now;
         _shell.Session.BackupCompletedAt = null;
+        _shell.Session.BackupJobId = Guid.NewGuid().ToString("N");
         _shell.GoToBackupProgressPage();
     }
 

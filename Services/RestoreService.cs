@@ -134,10 +134,26 @@ public sealed class RestoreService
         var restoreLogPath = Path.Combine(
             archiveDirectory,
             GetRestoreLogFileName(session.RestoreManifest.UserName));
-        var logger = new RestoreLogger(restoreLogPath);
+        var telemetry = new TelemetryService(
+            TelemetryService.GetTelemetryRootForRestore(session.RestorePackagePath),
+            Path.Combine(archiveDirectory, "logs", $"{session.RestoreManifest.UserName}-restore.telemetry.jsonl"),
+            new TelemetryContext
+            {
+                JobId = string.IsNullOrWhiteSpace(session.RestoreJobId) ? Guid.NewGuid().ToString("N") : session.RestoreJobId,
+                Operation = "restore",
+                UserProfile = session.RestoreManifest.UserName,
+                SourceComputer = session.RestoreManifest.SourceComputerName,
+                TargetComputer = Environment.MachineName,
+                RestorePath = targetProfilePath,
+                BackupPath = session.RestorePackagePath,
+                SourceOperatingSystem = session.RestoreManifest.SourceOperatingSystem,
+                TargetOperatingSystem = MachineInfoService.GetOperatingSystemDisplayName()
+            });
+        var logger = new RestoreLogger(restoreLogPath, telemetry);
 
         try
         {
+            await telemetry.FlushAsync(cancellationToken);
             logger.Add($"Restore started at {DateTime.Now:u}");
             logger.Add($"Restore package: {session.RestorePackagePath}");
             logger.Add($"Target profile path: {targetProfilePath}");
@@ -183,6 +199,14 @@ public sealed class RestoreService
 
             logger.Add($"Copied files: {copiedFileCount:N0}");
             logger.Add($"Restore finished at {DateTime.Now:u}");
+            telemetry.WriteInfo(
+                "Restore completed successfully.",
+                phase: "complete",
+                status: "success",
+                path: targetProfilePath,
+                durationSeconds: session.RestoreStartedAt.HasValue ? (DateTime.Now - session.RestoreStartedAt.Value).TotalSeconds : null,
+                filesCopied: copiedFileCount);
+            await telemetry.FlushAsync(cancellationToken);
 
             return new RestoreResult
             {
@@ -196,6 +220,13 @@ public sealed class RestoreService
         catch (Exception ex)
         {
             logger.Add($"Restore failed: {ex.Message}");
+            telemetry.WriteError(
+                $"Restore failed: {ex.Message}",
+                phase: "restore",
+                status: "failed",
+                exception: ex,
+                path: targetProfilePath);
+            await telemetry.FlushAsync(cancellationToken);
 
             return new RestoreResult
             {
@@ -1007,10 +1038,12 @@ public sealed class RestoreService
         private readonly object _gate = new();
         private readonly string _path;
         private readonly List<string> _messages = [];
+        private readonly TelemetryService _telemetry;
 
-        public RestoreLogger(string path)
+        public RestoreLogger(string path, TelemetryService telemetry)
         {
             _path = path;
+            _telemetry = telemetry;
         }
 
         public List<string> Messages
@@ -1038,6 +1071,47 @@ public sealed class RestoreService
                 {
                 }
             }
+
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                WriteTelemetry(message);
+            }
+        }
+
+        private void WriteTelemetry(string message)
+        {
+            var level = InferLevel(message);
+            if (level == "error")
+            {
+                _telemetry.WriteError(message, phase: "restore", status: "failed");
+                return;
+            }
+
+            if (level == "warning")
+            {
+                _telemetry.WriteWarning(message, phase: "restore", status: "warning");
+                return;
+            }
+
+            _telemetry.WriteInfo(message, phase: "restore", status: "running");
+        }
+
+        private static string InferLevel(string message)
+        {
+            if (message.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("could not", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+            {
+                return "error";
+            }
+
+            if (message.Contains("warning", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("skipped", StringComparison.OrdinalIgnoreCase))
+            {
+                return "warning";
+            }
+
+            return "info";
         }
     }
 

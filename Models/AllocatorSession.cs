@@ -24,6 +24,8 @@ public sealed class AllocatorSession
 
     public DateTime? BackupCompletedAt { get; set; }
 
+    public string BackupJobId { get; set; } = string.Empty;
+
     public long BackupArchiveSizeBytes { get; set; }
 
     public string BackupErrorMessage { get; set; } = string.Empty;
@@ -55,6 +57,8 @@ public sealed class AllocatorSession
     public DateTime? RestoreStartedAt { get; set; }
 
     public DateTime? RestoreCompletedAt { get; set; }
+
+    public string RestoreJobId { get; set; } = string.Empty;
 
     public string RestoreTargetProfilePath { get; set; } = string.Empty;
 

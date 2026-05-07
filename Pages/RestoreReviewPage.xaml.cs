@@ -83,6 +83,7 @@ public partial class RestoreReviewPage : Page
     {
         _shell.Session.RestoreStartedAt = DateTime.Now;
         _shell.Session.RestoreCompletedAt = null;
+        _shell.Session.RestoreJobId = Guid.NewGuid().ToString("N");
         _shell.GoToRestoreProgressPage();
     }
 
