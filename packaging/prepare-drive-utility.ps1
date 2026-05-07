@@ -27,7 +27,12 @@ function Get-DriveTypeLabel {
 }
 
 function Get-CandidateDrives {
-    $systemRoot = ([Environment]::GetEnvironmentVariable("SystemDrive") ?? "").TrimEnd('\') + "\"
+    $systemDrive = [Environment]::GetEnvironmentVariable("SystemDrive")
+    if ($null -eq $systemDrive) {
+        $systemDrive = ""
+    }
+
+    $systemRoot = $systemDrive.TrimEnd('\') + "\"
     $payloadRoot = [System.IO.Path]::GetPathRoot((Split-Path -Path $PSScriptRoot -Parent))
 
     Get-CimInstance Win32_LogicalDisk |
@@ -76,7 +81,9 @@ function Invoke-DrivePreparation {
     )
 
     $scriptPath = Join-Path $PSScriptRoot "prepare-drive.ps1"
-    $logPath = Join-Path ([System.IO.Path]::GetTempPath()) ("allocator-drive-prep-{0}.log" -f [guid]::NewGuid().ToString("N"))
+    $logBase = Join-Path ([System.IO.Path]::GetTempPath()) ("allocator-drive-prep-{0}" -f [guid]::NewGuid().ToString("N"))
+    $stdoutPath = "$logBase-stdout.log"
+    $stderrPath = "$logBase-stderr.log"
 
     $process = Start-Process -FilePath "powershell.exe" `
         -ArgumentList @(
@@ -87,22 +94,23 @@ function Invoke-DrivePreparation {
         ) `
         -PassThru `
         -Wait `
-        -RedirectStandardOutput $logPath `
-        -RedirectStandardError $logPath
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath
 
-    $output = if (Test-Path -LiteralPath $logPath) {
-        Get-Content -Path $logPath -Raw
-    } else {
-        ""
+    $outputParts = @()
+    if (Test-Path -LiteralPath $stdoutPath) {
+        $outputParts += Get-Content -Path $stdoutPath -Raw
     }
 
-    if (Test-Path -LiteralPath $logPath) {
-        Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $stderrPath) {
+        $outputParts += Get-Content -Path $stderrPath -Raw
     }
+
+    Remove-Item -LiteralPath $stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue
 
     return [pscustomobject]@{
         ExitCode = $process.ExitCode
-        Output   = $output.Trim()
+        Output   = (($outputParts -join [Environment]::NewLine).Trim())
     }
 }
 

@@ -34,7 +34,7 @@
                                FontSize="15"
                                Foreground="{StaticResource AllocatorMutedBrush}"
                                TextWrapping="Wrap"
-                               Text="The archive, backup details file, printer file, and backup log will all be saved here." />
+                               Text="The archive, backup details file, printers file, text log, and logs folder will all be created here. A drive-level telemetry queue is also maintained automatically." />
                     <TextBox x:Name="DestinationTextBox"
                              Margin="0,14,0,0"
                              VerticalContentAlignment="Center"

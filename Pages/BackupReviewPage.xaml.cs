@@ -28,9 +28,10 @@ public partial class BackupReviewPage : Page
             $"Destination: {_shell.Session.BackupDestinationFolder}\n" +
             $"Backup folder: {outputFolder}\n" +
             $"Archive file: {_shell.Session.BackupPackageName}\n" +
-            $"Backup details: {_shell.Session.BackupMetadataFileName}\n" +
+            $"Backup details file: {_shell.Session.BackupMetadataFileName}\n" +
             $"Printers file: {_shell.Session.BackupPrintersFileName}\n" +
-            $"Log file: {_shell.Session.BackupLogFileName}";
+            $"Text log file: {_shell.Session.BackupLogFileName}\n" +
+            "Logs folder: logs\\";
         UpdateCanBegin();
     }
 

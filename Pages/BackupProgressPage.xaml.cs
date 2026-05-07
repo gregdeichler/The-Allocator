@@ -38,9 +38,10 @@ public partial class BackupProgressPage : Page
             BackupProgressBar.Value = 100;
             ProgressText.Text =
                 $"Backup archive created:\n{result.ArchivePath}\n\n" +
-                $"Metadata file:\n{result.MetadataPath}\n\n" +
+                $"Backup details file:\n{result.MetadataPath}\n\n" +
                 $"Printers file:\n{result.PrintersPath}\n\n" +
-                $"Log file:\n{result.LogPath}\n\n" +
+                $"Text log file:\n{result.LogPath}\n\n" +
+                $"Logs folder:\n{System.IO.Path.Combine(System.IO.Path.GetDirectoryName(result.LogPath) ?? string.Empty)}\n\n" +
                 $"Archive size: {SizeFormattingService.ToReadableSize(result.ArchiveSizeBytes)}\n" +
                 $"Copied files: {result.CopiedFileCount:N0}";
             FinishButton.IsEnabled = true;

@@ -85,9 +85,10 @@ public partial class BackupSelectDestinationPage : Page
         OutputSummaryText.Text =
             $"Backup folder: {backupFolderPreview}\n" +
             $"Archive file: {_shell.Session.BackupPackageName}\n" +
-            $"Backup details: {_shell.Session.BackupMetadataFileName}\n" +
+            $"Backup details file: {_shell.Session.BackupMetadataFileName}\n" +
             $"Printers file: {_shell.Session.BackupPrintersFileName}\n" +
-            $"Log file: {_shell.Session.BackupLogFileName}";
+            $"Text log file: {_shell.Session.BackupLogFileName}\n" +
+            "Logs folder: logs\\";
     }
 
     private static string GetMetadataFileName(string? userName)

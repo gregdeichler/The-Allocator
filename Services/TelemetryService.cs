@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using TheAllocator.Models;
 
 namespace TheAllocator.Services;
@@ -16,7 +17,9 @@ public sealed class TelemetryService
     private static readonly HttpClient HttpClient = CreateHttpClient();
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        WriteIndented = false
+        WriteIndented = false,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     public TelemetryService(string telemetryRoot, string jsonLogPath, TelemetryContext context)
@@ -24,6 +27,11 @@ public sealed class TelemetryService
         TelemetryRoot = telemetryRoot;
         JsonLogPath = jsonLogPath;
         Context = context;
+        CurrentBatchPath = Path.Combine(
+            TelemetryRoot,
+            "Telemetry",
+            "pending",
+            $"{Context.JobId}.json");
     }
 
     public string TelemetryRoot { get; }
@@ -31,6 +39,8 @@ public sealed class TelemetryService
     public string JsonLogPath { get; }
 
     public TelemetryContext Context { get; }
+
+    private string CurrentBatchPath { get; }
 
     public List<TelemetryEvent> PendingEvents { get; } = [];
 
@@ -118,6 +128,7 @@ public sealed class TelemetryService
 
         PendingEvents.Add(telemetryEvent);
         AppendJsonLine(telemetryEvent);
+        PersistPendingSnapshot();
     }
 
     private void AppendJsonLine(TelemetryEvent telemetryEvent)
@@ -140,15 +151,22 @@ public sealed class TelemetryService
             return;
         }
 
-        var pendingDirectory = Path.Combine(TelemetryRoot, "Telemetry", "pending");
-        Directory.CreateDirectory(pendingDirectory);
-
-        var batchFileName = $"{DateTime.UtcNow:yyyyMMdd-HHmmssfff}-{Context.JobId}.json";
-        var batchPath = Path.Combine(pendingDirectory, batchFileName);
         var batchPayload = JsonSerializer.Serialize(new { events = PendingEvents }, JsonOptions);
+        Directory.CreateDirectory(Path.GetDirectoryName(CurrentBatchPath) ?? TelemetryRoot);
+        await File.WriteAllTextAsync(CurrentBatchPath, batchPayload, Encoding.UTF8, cancellationToken);
+    }
 
-        await File.WriteAllTextAsync(batchPath, batchPayload, Encoding.UTF8, cancellationToken);
-        PendingEvents.Clear();
+    private void PersistPendingSnapshot()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(CurrentBatchPath) ?? TelemetryRoot);
+            var batchPayload = JsonSerializer.Serialize(new { events = PendingEvents }, JsonOptions);
+            File.WriteAllText(CurrentBatchPath, batchPayload, Encoding.UTF8);
+        }
+        catch
+        {
+        }
     }
 
     private static async Task UploadPendingBatchesAsync(string telemetryRoot, CancellationToken cancellationToken)
@@ -161,6 +179,7 @@ public sealed class TelemetryService
 
         var sentDirectory = Path.Combine(telemetryRoot, "Telemetry", "sent");
         var failedDirectory = Path.Combine(telemetryRoot, "Telemetry", "failed");
+        var uploadStatusLogPath = Path.Combine(telemetryRoot, "Telemetry", "upload-status.log");
         Directory.CreateDirectory(sentDirectory);
         Directory.CreateDirectory(failedDirectory);
 
@@ -182,9 +201,15 @@ public sealed class TelemetryService
 
                 if (response.IsSuccessStatusCode)
                 {
+                    AppendUploadStatus(uploadStatusLogPath, $"[{DateTime.Now:u}] Uploaded telemetry batch successfully: {Path.GetFileName(batchPath)}");
                     MoveBatch(batchPath, sentDirectory);
                     continue;
                 }
+
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                AppendUploadStatus(
+                    uploadStatusLogPath,
+                    $"[{DateTime.Now:u}] Telemetry upload returned {(int)response.StatusCode} {response.StatusCode} for {Path.GetFileName(batchPath)}. Response: {responseBody}");
 
                 if (IsPermanentFailure(response.StatusCode))
                 {
@@ -196,6 +221,7 @@ public sealed class TelemetryService
             }
             catch
             {
+                AppendUploadStatus(uploadStatusLogPath, $"[{DateTime.Now:u}] Telemetry upload threw an exception for {Path.GetFileName(batchPath)}.");
                 break;
             }
         }
@@ -232,6 +258,18 @@ public sealed class TelemetryService
 
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return client;
+    }
+
+    private static void AppendUploadStatus(string logPath, string line)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(logPath) ?? Path.GetTempPath());
+            File.AppendAllText(logPath, line + Environment.NewLine, Encoding.UTF8);
+        }
+        catch
+        {
+        }
     }
 
     public static string GetTelemetryRootForBackup(string backupDestinationFolder) =>
