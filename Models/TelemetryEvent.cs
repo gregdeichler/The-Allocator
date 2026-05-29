@@ -8,6 +8,8 @@ public sealed class TelemetryEvent
 
     public string App { get; set; } = "The Allocator";
 
+    public string Platform { get; set; } = "windows";
+
     public string JobId { get; set; } = string.Empty;
 
     public string Computer { get; set; } = string.Empty;

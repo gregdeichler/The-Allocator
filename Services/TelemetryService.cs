@@ -100,6 +100,7 @@ public sealed class TelemetryService
             Timestamp = DateTime.UtcNow,
             Level = level,
             App = "The Allocator",
+            Platform = Context.Platform,
             JobId = Context.JobId,
             Computer = Environment.MachineName,
             Operation = Context.Operation,
@@ -327,6 +328,8 @@ public sealed class TelemetryService
 public sealed class TelemetryContext
 {
     public string JobId { get; set; } = Guid.NewGuid().ToString("N");
+
+    public string Platform { get; set; } = "windows";
 
     public string Operation { get; set; } = string.Empty;
 

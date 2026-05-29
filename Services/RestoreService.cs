@@ -202,7 +202,7 @@ public sealed class RestoreService
             telemetry.WriteInfo(
                 "Restore completed successfully.",
                 phase: "complete",
-                status: "success",
+                status: "completed",
                 path: targetProfilePath,
                 durationSeconds: session.RestoreStartedAt.HasValue ? (DateTime.Now - session.RestoreStartedAt.Value).TotalSeconds : null,
                 filesCopied: copiedFileCount);
@@ -389,7 +389,7 @@ public sealed class RestoreService
 
         if (extractCode == 1)
         {
-            logger.Add("7-Zip reported warnings during direct restore extraction, but the restore continued.");
+            logger.Add("7-Zip completed with warnings during direct restore extraction, but the restore continued.");
         }
 
         return CountRestoredFiles(targetProfilePath, includePatterns, logger);
@@ -1098,6 +1098,12 @@ public sealed class RestoreService
 
         private static string InferLevel(string message)
         {
+            if (message.Contains("Failed processing 0 files", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("Successfully processed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "info";
+            }
+
             if (message.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
                 message.Contains("could not", StringComparison.OrdinalIgnoreCase) ||
                 message.Contains("blocked", StringComparison.OrdinalIgnoreCase))

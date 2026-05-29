@@ -6,6 +6,8 @@ public sealed class BackupManifest
 
     public string AppVersion { get; set; } = string.Empty;
 
+    public string JobId { get; set; } = string.Empty;
+
     public DateTime CreatedAt { get; set; }
 
     public string SourceComputerName { get; set; } = string.Empty;

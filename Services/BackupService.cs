@@ -17,6 +17,8 @@ public sealed class BackupService
     private static readonly string[] ExcludedDirectoryNames =
     [
         "Temp",
+        "Application Data",
+        "History",
         "INetCache",
         "Temporary Internet Files",
         "CrashDumps",
@@ -26,6 +28,7 @@ public sealed class BackupService
         "Code Cache",
         "GPUCache",
         "Service Worker",
+        "WindowsApps",
         "My Music",
         "My Pictures",
         "My Videos"
@@ -136,6 +139,7 @@ public sealed class BackupService
             var manifest = new BackupManifest
             {
                 AppVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0.0",
+                JobId = telemetry.Context.JobId,
                 CreatedAt = DateTime.Now,
                 SourceComputerName = Environment.MachineName,
                 SourceOperatingSystem = MachineInfoService.GetOperatingSystemDisplayName(),
@@ -166,7 +170,8 @@ public sealed class BackupService
                 GetExcludeArguments(),
                 progressProxy,
                 cancellationToken);
-            if (!IsAcceptableSevenZipExitCode(archiveExitCode))
+            if (!IsAcceptableSevenZipExitCode(archiveExitCode) &&
+                !IsIgnorableCloudPlaceholderFailure(messages))
             {
                 errorCount++;
                 telemetry.WriteError($"7-Zip failed during archive creation with exit code {archiveExitCode}.", phase: currentPhase, status: "failed", errorCode: archiveExitCode.ToString(), path: archivePath);
@@ -180,11 +185,26 @@ public sealed class BackupService
                 };
             }
 
+            if (!IsAcceptableSevenZipExitCode(archiveExitCode))
+            {
+                warningCount++;
+                messages.Add("Cloud-backed placeholder files under Windows app aliases were skipped, and the backup continued.");
+                telemetry.WriteWarning("Cloud-backed placeholder files under Windows app aliases were skipped, and the backup continued.", phase: currentPhase, status: "warning", errorCode: archiveExitCode.ToString(), path: archivePath);
+            }
+
+            var archiveWarningSummary = GetSevenZipWarningSummary(messages);
             AddSevenZipExitCodeMessage(messages, archiveExitCode, "archive creation");
             if (archiveExitCode == 1)
             {
                 warningCount++;
-                telemetry.WriteWarning("7-Zip reported warnings during archive creation, but the backup continued.", phase: currentPhase, status: "warning", errorCode: archiveExitCode.ToString(), path: archivePath);
+                telemetry.WriteWarning(
+                    string.IsNullOrWhiteSpace(archiveWarningSummary)
+                        ? "7-Zip completed with warnings during archive creation."
+                        : $"7-Zip completed with warnings during archive creation: {archiveWarningSummary}",
+                    phase: currentPhase,
+                    status: "warning",
+                    errorCode: "7ZIP_WARNING",
+                    path: archivePath);
             }
 
             currentPhase = "details";
@@ -214,7 +234,7 @@ public sealed class BackupService
             if (metadataArchiveExitCode == 1)
             {
                 warningCount++;
-                telemetry.WriteWarning("7-Zip reported warnings while adding backup details, but the backup continued.", phase: currentPhase, status: "warning", errorCode: metadataArchiveExitCode.ToString(), path: archivePath);
+                telemetry.WriteWarning("7-Zip completed with warnings while adding backup details.", phase: currentPhase, status: "warning", errorCode: "7ZIP_WARNING", path: archivePath);
             }
 
             manifest.ArchiveSizeBytes = new FileInfo(archivePath).Length;
@@ -248,17 +268,18 @@ public sealed class BackupService
             if (manifestUpdateExitCode == 1)
             {
                 warningCount++;
-                telemetry.WriteWarning("7-Zip reported warnings while finalizing backup metadata, but the backup continued.", phase: currentPhase, status: "warning", errorCode: manifestUpdateExitCode.ToString(), path: archivePath);
+                telemetry.WriteWarning("7-Zip completed with warnings while finalizing backup metadata.", phase: currentPhase, status: "warning", errorCode: "7ZIP_WARNING", path: archivePath);
             }
 
             messages.Add($"Archive created at {archivePath}");
             messages.Add($"Archive size: {SizeFormattingService.ToReadableSize(manifest.ArchiveSizeBytes)}");
             messages.Add($"Archived files: {copiedFileCount:N0}");
             messages.Add("The archive was created directly from the source profile without duplicating the full profile onto the backup drive.");
+            var finalStatus = warningCount > 0 ? "completed_with_warnings" : "completed";
             telemetry.WriteInfo(
                 "Backup completed successfully.",
                 phase: "complete",
-                status: "success",
+                status: finalStatus,
                 path: archivePath,
                 durationSeconds: session.BackupStartedAt.HasValue ? (DateTime.Now - session.BackupStartedAt.Value).TotalSeconds : null,
                 filesCopied: copiedFileCount,
@@ -447,6 +468,10 @@ public sealed class BackupService
         }
 
         arguments.Add(@"-xr!LocalCache");
+        arguments.Add(@"-xr!WindowsApps");
+        arguments.Add(@"-xr!Application Data");
+        arguments.Add(@"-xr!History");
+        arguments.Add(@"-x!AppData\Local\Microsoft\WindowsApps\*");
         return arguments;
     }
 
@@ -470,8 +495,9 @@ public sealed class BackupService
             return true;
         }
 
-        return fullPath.Contains(@"\Packages\", StringComparison.OrdinalIgnoreCase)
-            && fullPath.EndsWith(@"\LocalCache", StringComparison.OrdinalIgnoreCase);
+        return (fullPath.Contains(@"\Packages\", StringComparison.OrdinalIgnoreCase)
+                && fullPath.EndsWith(@"\LocalCache", StringComparison.OrdinalIgnoreCase)) ||
+               fullPath.Contains(@"\AppData\Local\Microsoft\WindowsApps", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool ShouldExcludeFile(string fileName) =>
@@ -489,6 +515,45 @@ public sealed class BackupService
         {
             messages.Add($"7-Zip reported warnings during {operation}, but the backup continued.");
         }
+    }
+
+    private static string GetSevenZipWarningSummary(List<string> messages)
+    {
+        if (messages.Any(message => message.Contains("The cloud file provider is not running.", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "Cloud-backed placeholder files were unavailable.";
+        }
+
+        var inaccessibleCount = messages.Count(message =>
+            message.Contains("The file cannot be accessed by the system.", StringComparison.OrdinalIgnoreCase));
+        if (inaccessibleCount > 0)
+        {
+            return $"{inaccessibleCount} files could not be accessed by the system.";
+        }
+
+        var accessDeniedCount = messages.Count(message =>
+            message.Contains("Access is denied.", StringComparison.OrdinalIgnoreCase));
+        if (accessDeniedCount > 0)
+        {
+            return $"{accessDeniedCount} files or folders returned access denied.";
+        }
+
+        var warningLine = messages.LastOrDefault(message =>
+            message.Contains("WARNING:", StringComparison.OrdinalIgnoreCase));
+        return warningLine ?? string.Empty;
+    }
+
+    private static bool IsIgnorableCloudPlaceholderFailure(List<string> messages)
+    {
+        var sawCloudProviderFailure = messages.Any(message =>
+            message.Contains("The cloud file provider is not running.", StringComparison.OrdinalIgnoreCase));
+        if (!sawCloudProviderFailure)
+        {
+            return false;
+        }
+
+        return messages.Any(message =>
+            message.Contains(@"AppData\Local\Microsoft\WindowsApps\", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void SafeDeleteDirectory(string directoryPath, List<string> messages)

@@ -63,8 +63,12 @@ public sealed class MachineInfoService
         {
         }
 
+        var systemDrive = Environment.GetEnvironmentVariable("SystemDrive");
         var totalFixedStorageBytes = DriveInfo.GetDrives()
-            .Where(drive => drive.DriveType == DriveType.Fixed && drive.IsReady)
+            .Where(drive => drive.IsReady)
+            .Where(drive => string.IsNullOrWhiteSpace(systemDrive)
+                ? drive.DriveType == DriveType.Fixed
+                : drive.RootDirectory.FullName.Equals(systemDrive.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))
             .Sum(drive => drive.TotalSize);
 
         return new MachineInfoSnapshot
@@ -77,4 +81,5 @@ public sealed class MachineInfoService
                 : "Storage unavailable"
         };
     }
+
 }

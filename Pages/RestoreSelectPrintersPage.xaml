@@ -46,22 +46,25 @@
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                       Style="{StaticResource CompactPrinterCheckBoxStyle}">
                                 <StackPanel>
-                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding Name}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding Name}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="12,0,0,0"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource AllocatorMutedBrush}"
+                                                   Text="{Binding IsDefault, StringFormat=Default: {0}}" />
+                                    </Grid>
                                     <TextBlock Margin="0,3,0,0"
-                                               FontSize="12"
+                                               FontSize="11"
                                                Foreground="{StaticResource AllocatorMutedBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="{Binding ConnectionPath, StringFormat=Connection: {0}}" />
-                                    <TextBlock Margin="0,2,0,0"
-                                               FontSize="12"
-                                               Foreground="{StaticResource AllocatorMutedBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="{Binding PortName, StringFormat=Port: {0}}" />
-                                    <TextBlock Margin="0,2,0,0"
-                                               FontSize="12"
-                                               Foreground="{StaticResource AllocatorMutedBrush}"
-                                               TextWrapping="Wrap"
-                                               Text="{Binding DriverName, StringFormat=Driver: {0}}" />
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               Text="{Binding RestoreDisplayDetail}" />
                                 </StackPanel>
                             </CheckBox>
                         </DataTemplate>

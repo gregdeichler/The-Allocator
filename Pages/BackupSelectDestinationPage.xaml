@@ -35,16 +35,23 @@
                                Foreground="{StaticResource AllocatorMutedBrush}"
                                TextWrapping="Wrap"
                                Text="The archive, backup details file, printers file, text log, and logs folder will all be created here. A drive-level telemetry queue is also maintained automatically." />
-                    <TextBox x:Name="DestinationTextBox"
-                             Margin="0,14,0,0"
-                             VerticalContentAlignment="Center"
-                             TextChanged="DestinationTextBox_TextChanged" />
-                    <Button Margin="0,14,0,0"
-                            HorizontalAlignment="Left"
-                            MinWidth="132"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Click="Browse_Click"
-                            Content="Browse..." />
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="DestinationTextBox"
+                                 Grid.Column="0"
+                                 VerticalContentAlignment="Center"
+                                 TextChanged="DestinationTextBox_TextChanged" />
+                        <Button Grid.Column="2"
+                                MinWidth="132"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="Browse_Click"
+                                Content="Browse..." />
+                    </Grid>
                 </StackPanel>
             </Border>
 

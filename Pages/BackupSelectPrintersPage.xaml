@@ -46,23 +46,31 @@
                         <DataTemplate>
                             <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                       Style="{StaticResource CompactPrinterCheckBoxStyle}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <TextBlock FontSize="14"
-                                               FontWeight="SemiBold"
-                                               VerticalAlignment="Center"
-                                               Text="{Binding Name}" />
-                                    <TextBlock Grid.Column="1"
-                                               Margin="16,0,0,0"
-                                               FontSize="13"
+                                        <TextBlock FontSize="14"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding Name}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="16,0,0,0"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource AllocatorMutedBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding IsDefault, StringFormat=Default: {0}}" />
+                                    </Grid>
+                                    <TextBlock Margin="0,3,0,0"
+                                               FontSize="11"
                                                Foreground="{StaticResource AllocatorMutedBrush}"
-                                               VerticalAlignment="Center"
-                                               Text="{Binding IsDefault, StringFormat=Default: {0}}" />
-                                </Grid>
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               Text="{Binding BackupDisplayDetail}" />
+                                </StackPanel>
                             </CheckBox>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
