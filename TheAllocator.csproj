@@ -26,17 +26,21 @@
     <Compile Remove="release\**\*.cs" />
     <Compile Remove="obj\**\*.cs" />
     <Compile Remove="bin\**\*.cs" />
+    <Compile Remove="tests\**\*.cs" />
     <Page Remove="AllocatorShell.xaml" />
     <Page Remove="MainWindow.xaml" />
     <Page Remove="release\**\*.xaml" />
     <Page Remove="obj\**\*.xaml" />
     <Page Remove="bin\**\*.xaml" />
+    <Page Remove="tests\**\*.xaml" />
     <EmbeddedResource Remove="release\**\*" />
     <EmbeddedResource Remove="obj\**\*" />
     <EmbeddedResource Remove="bin\**\*" />
+    <EmbeddedResource Remove="tests\**\*" />
     <None Remove="release\**\*" />
     <None Remove="obj\**\*" />
     <None Remove="bin\**\*" />
+    <None Remove="tests\**\*" />
   </ItemGroup>
 
   <ItemGroup>
