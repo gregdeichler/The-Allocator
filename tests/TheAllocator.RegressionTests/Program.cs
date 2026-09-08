@@ -2,6 +2,10 @@ using System.Text.Json;
 using TheAllocator.Models;
 using TheAllocator.Services;
 
+var repositoryRoot = FindRepositoryRoot();
+var restoreServiceSource = File.ReadAllText(Path.Combine(repositoryRoot, "Services", "RestoreService.cs"));
+var windowsProfileSource = File.ReadAllText(Path.Combine(repositoryRoot, "Services", "WindowsProfileService.cs"));
+
 var tests = new (string Name, Action Body)[]
 {
     ("saved host address wins over port name", () =>
@@ -45,7 +49,22 @@ var tests = new (string Name, Action Body)[]
 
     ("missing SID is blocked", () =>
         Throws<InvalidOperationException>(() =>
-            RestoreIdentityPolicy.EnsureSidMatches("", "S-1-5-21-200", "test account")))
+            RestoreIdentityPolicy.EnsureSidMatches("", "S-1-5-21-200", "test account"))),
+
+    ("restore uses saved host address policy", () =>
+        Contains("PrinterPortAddressPolicy.ResolveRestoreHostAddress(printer.HostAddress, printer.PortName)", restoreServiceSource)),
+
+    ("required printer commands remain fatal", () =>
+    {
+        True(CountOccurrences(restoreServiceSource, "throwOnError: true") >= 3);
+        Contains("if (throwOnError && process.ExitCode != 0)", restoreServiceSource);
+    }),
+
+    ("existing profile SID check uses testable policy", () =>
+    {
+        Contains("RestoreIdentityPolicy.EnsureSidMatches", windowsProfileSource);
+        False(windowsProfileSource.Contains("CreateIdentityFromSid(", StringComparison.Ordinal));
+    })
 };
 
 var failures = new List<string>();
@@ -68,6 +87,43 @@ Console.WriteLine($"Regression tests: {tests.Length - failures.Count} passed, {f
 if (failures.Count > 0)
 {
     Environment.ExitCode = 1;
+}
+
+static string FindRepositoryRoot()
+{
+    var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
+    while (directory is not null)
+    {
+        if (File.Exists(Path.Combine(directory.FullName, "TheAllocator.csproj")))
+        {
+            return directory.FullName;
+        }
+
+        directory = directory.Parent;
+    }
+
+    throw new DirectoryNotFoundException("Could not locate TheAllocator.csproj from the current working directory.");
+}
+
+static int CountOccurrences(string text, string value)
+{
+    var count = 0;
+    var index = 0;
+    while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+    {
+        count++;
+        index += value.Length;
+    }
+
+    return count;
+}
+
+static void Contains(string expected, string actual)
+{
+    if (!actual.Contains(expected, StringComparison.Ordinal))
+    {
+        throw new Exception($"Expected source to contain '{expected}'.");
+    }
 }
 
 static void Equal<T>(T expected, T actual)
