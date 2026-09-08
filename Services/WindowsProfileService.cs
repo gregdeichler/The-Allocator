@@ -25,11 +25,12 @@ public sealed class WindowsProfileService
         var resolvedIdentity = ResolveIdentity(accountName, session.RestoreTargetUser);
 
         var selectedProfileSid = session.SelectedRestoreExistingProfile?.Sid;
-        if (session.RestoreUseExistingAccount && !string.IsNullOrWhiteSpace(selectedProfileSid) &&
-            !string.Equals(selectedProfileSid, resolvedIdentity.Sid, StringComparison.OrdinalIgnoreCase))
+        if (session.RestoreUseExistingAccount && !string.IsNullOrWhiteSpace(selectedProfileSid))
         {
-            throw new InvalidOperationException(
-                $"The selected Windows profile belongs to SID '{selectedProfileSid}', but account '{accountName}' currently resolves to SID '{resolvedIdentity.Sid}'. The restore was stopped before changing the profile.");
+            RestoreIdentityPolicy.EnsureSidMatches(
+                selectedProfileSid,
+                resolvedIdentity.Sid,
+                $"Selected Windows profile for '{accountName}'");
         }
 
         return resolvedIdentity;
@@ -154,7 +155,7 @@ public sealed class WindowsProfileService
     private static void SafeDeleteUnregisteredProfileDirectory(string profilePath)
     {
         var profilesRoot = Path.GetFullPath(Path.Combine(
-            Environment.GetEnvironmentVariable("SystemDrive") ?? "C:\\",
+            Environment.GetEnvironmentVariable("SystemDrive") ?? @"C:\",
             "Users"));
         var resolvedPath = Path.GetFullPath(profilePath);
         var expectedPrefix = profilesRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
