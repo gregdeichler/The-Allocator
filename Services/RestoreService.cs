@@ -588,11 +588,23 @@ public sealed class RestoreService
         RestoreLogger logger,
         CancellationToken cancellationToken)
     {
-        var hostAddress = printer.PortName;
+        var hostAddress = PrinterPortAddressPolicy.ResolveRestoreHostAddress(printer.HostAddress, printer.PortName);
         var portName = printer.PortName;
         var printerName = printer.Name;
         var driverPackage = GetNormalizedPrinterDriverPackage(printer);
         var driverName = driverPackage?.DriverName ?? printer.DriverName;
+
+        if (string.IsNullOrWhiteSpace(hostAddress))
+        {
+            var message = $"Printer '{printerName}' cannot be recreated because its TCP/IP host address is unavailable. Port '{portName}' is not safe to infer. Recreate this printer manually or make a new backup that captures HostAddress.";
+            logger.Add(message);
+            throw new InvalidOperationException(message);
+        }
+
+        if (string.IsNullOrWhiteSpace(printer.HostAddress))
+        {
+            logger.Add($"Legacy printer metadata for '{printerName}' did not include HostAddress; inferred '{hostAddress}' from port '{portName}'.");
+        }
 
         if (driverPackage is not null)
         {
