@@ -1,0 +1,39 @@
+name: Publish Release
+
+on:
+  push:
+    branches:
+      - 'release/*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build release artifacts
+        shell: pwsh
+        run: ./Build-Release.ps1 -Version 1.1.0
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.1.0 `
+            "release/1.1.0/TheAllocator-1.1.0-app.zip" `
+            "release/1.1.0/installer/TheAllocator-1.1.0-Setup.exe" `
+            "release/1.1.0/TheAllocator-1.1.0-source.zip" `
+            --target $env:GITHUB_SHA `
+            --title "The Allocator 1.1.0" `
+            --notes-file "docs/Release-Notes-v1.1.0.md" `
+            --verify-tag=false
