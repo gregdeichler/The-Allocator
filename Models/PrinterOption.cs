@@ -10,6 +10,8 @@ public sealed class PrinterOption
 
     public string PortName { get; init; } = string.Empty;
 
+    public string HostAddress { get; init; } = string.Empty;
+
     public bool IsNetworkPrinter { get; init; }
 
     public string ConnectionPath { get; init; } = string.Empty;
@@ -35,6 +37,11 @@ public sealed class PrinterOption
             if (!string.IsNullOrWhiteSpace(PortName))
             {
                 parts.Add($"Port: {PortName}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(HostAddress))
+            {
+                parts.Add($"Host: {HostAddress}");
             }
 
             if (!string.IsNullOrWhiteSpace(DriverName))
