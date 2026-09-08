@@ -10,6 +10,8 @@ public sealed class BackupPrinterInfo
 
     public string PortName { get; init; } = string.Empty;
 
+    public string HostAddress { get; init; } = string.Empty;
+
     public bool IsNetworkPrinter { get; init; }
 
     public string ConnectionPath { get; init; } = string.Empty;
