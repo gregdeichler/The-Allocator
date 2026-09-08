@@ -154,7 +154,7 @@ public sealed class WindowsProfileService
     private static void SafeDeleteUnregisteredProfileDirectory(string profilePath)
     {
         var profilesRoot = Path.GetFullPath(Path.Combine(
-            Environment.GetEnvironmentVariable("SystemDrive") ?? @"C:\",
+            Environment.GetEnvironmentVariable("SystemDrive") ?? "C:\\",
             "Users"));
         var resolvedPath = Path.GetFullPath(profilePath);
         var expectedPrefix = profilesRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
