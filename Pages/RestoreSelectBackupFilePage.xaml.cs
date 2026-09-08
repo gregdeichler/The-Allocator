@@ -70,6 +70,7 @@ public partial class RestoreSelectBackupFilePage : Page
                 IsDefault = printer.IsDefault,
                 DriverName = printer.DriverName,
                 PortName = printer.PortName,
+                HostAddress = printer.HostAddress,
                 IsNetworkPrinter = printer.IsNetworkPrinter,
                 ConnectionPath = printer.ConnectionPath,
                 IsSelected = true
@@ -82,6 +83,7 @@ public partial class RestoreSelectBackupFilePage : Page
                 IsDefault = printer.IsDefault,
                 DriverName = printer.DriverName,
                 PortName = printer.PortName,
+                HostAddress = printer.HostAddress,
                 IsNetworkPrinter = printer.IsNetworkPrinter,
                 ConnectionPath = printer.ConnectionPath,
                 IsSelected = printer.IsSelected
