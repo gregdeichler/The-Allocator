@@ -19,25 +19,20 @@ public sealed class WindowsProfileService
             ? session.RestoreTargetAccountDisplay
             : $@"{Environment.MachineName}\{session.RestoreTargetUser}";
 
+        // Always resolve the target account through Windows. Never construct the target
+        // identity from backup metadata: the backup SID is evidence to validate against,
+        // not proof that the selected account still maps to that SID.
+        var resolvedIdentity = ResolveIdentity(accountName, session.RestoreTargetUser);
+
         var selectedProfileSid = session.SelectedRestoreExistingProfile?.Sid;
-        if (session.RestoreUseExistingAccount && !string.IsNullOrWhiteSpace(selectedProfileSid))
+        if (session.RestoreUseExistingAccount && !string.IsNullOrWhiteSpace(selectedProfileSid) &&
+            !string.Equals(selectedProfileSid, resolvedIdentity.Sid, StringComparison.OrdinalIgnoreCase))
         {
-            return CreateIdentityFromSid(accountName, session.RestoreTargetUser, selectedProfileSid);
+            throw new InvalidOperationException(
+                $"The selected Windows profile belongs to SID '{selectedProfileSid}', but account '{accountName}' currently resolves to SID '{resolvedIdentity.Sid}'. The restore was stopped before changing the profile.");
         }
 
-        var sourceUser = GetComparableAccountName(session.RestoreManifest?.UserName);
-        var targetUser = GetComparableAccountName(session.RestoreTargetUser);
-        var sameDomainUser = session.RestoreManifest?.IsDomainLinked == true &&
-                             session.RestoreUseDomainAccount &&
-                             !string.IsNullOrWhiteSpace(sourceUser) &&
-                             string.Equals(sourceUser, targetUser, StringComparison.OrdinalIgnoreCase);
-
-        if (sameDomainUser && !string.IsNullOrWhiteSpace(session.RestoreManifest?.Sid))
-        {
-            return CreateIdentityFromSid(accountName, session.RestoreTargetUser, session.RestoreManifest.Sid);
-        }
-
-        return ResolveIdentity(accountName, session.RestoreTargetUser);
+        return resolvedIdentity;
     }
 
     public WindowsProfileIdentity ResolveIdentity(string accountName, string userName)
@@ -57,37 +52,6 @@ public sealed class WindowsProfileService
             throw new InvalidOperationException(
                 $"Windows could not resolve the target account '{accountName}'. Confirm the account exists and, for a domain account, that this computer can reach the domain.");
         }
-    }
-
-    private static WindowsProfileIdentity CreateIdentityFromSid(string accountName, string userName, string sidValue)
-    {
-        try
-        {
-            var sid = new SecurityIdentifier(sidValue);
-            return new WindowsProfileIdentity(accountName, userName, sid.Value);
-        }
-        catch (ArgumentException)
-        {
-            throw new InvalidOperationException($"The saved Windows SID for {accountName} is not valid.");
-        }
-    }
-
-    private static string? GetComparableAccountName(string? accountName)
-    {
-        if (string.IsNullOrWhiteSpace(accountName))
-        {
-            return null;
-        }
-
-        var trimmed = accountName.Trim();
-        var slashIndex = trimmed.LastIndexOf('\\');
-        if (slashIndex >= 0 && slashIndex < trimmed.Length - 1)
-        {
-            trimmed = trimmed[(slashIndex + 1)..];
-        }
-
-        var atIndex = trimmed.IndexOf('@');
-        return atIndex > 0 ? trimmed[..atIndex] : trimmed;
     }
 
     public string CreateFreshProfile(WindowsProfileIdentity identity, string expectedProfilePath)
@@ -190,7 +154,7 @@ public sealed class WindowsProfileService
     private static void SafeDeleteUnregisteredProfileDirectory(string profilePath)
     {
         var profilesRoot = Path.GetFullPath(Path.Combine(
-            Environment.GetEnvironmentVariable("SystemDrive") ?? @"C:",
+            Environment.GetEnvironmentVariable("SystemDrive") ?? @"C:\",
             "Users"));
         var resolvedPath = Path.GetFullPath(profilePath);
         var expectedPrefix = profilesRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
