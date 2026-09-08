@@ -557,7 +557,9 @@ public sealed class RestoreService
                     "rundll32.exe",
                     $"printui.dll,PrintUIEntry /ga /n \"{connectionPath}\"",
                     logger,
-                    cancellationToken);
+                    cancellationToken,
+                    throwOnError: true,
+                    failureContext: $"connecting network printer '{printer.Name}'");
 
                 if (printer.IsDefault)
                 {
@@ -599,8 +601,9 @@ public sealed class RestoreService
 
             if (!driverInstalled)
             {
-                logger.Add($"Printer '{printerName}' was not recreated because driver '{driverName}' could not be installed.");
-                return;
+                var message = $"Printer '{printerName}' was not recreated because driver '{driverName}' could not be installed.";
+                logger.Add(message);
+                throw new InvalidOperationException(message);
             }
         }
 
@@ -608,13 +611,17 @@ public sealed class RestoreService
             "powershell.exe",
             $"-NoProfile -ExecutionPolicy Bypass -Command \"try {{ if (-not (Get-PrinterPort -Name '{EscapePowerShell(portName)}' -ErrorAction SilentlyContinue)) {{ Add-PrinterPort -Name '{EscapePowerShell(portName)}' -PrinterHostAddress '{EscapePowerShell(hostAddress)}' -ErrorAction Stop }}; exit 0 }} catch {{ Write-Error $_; exit 1 }}\"",
             logger,
-            cancellationToken);
+            cancellationToken,
+            throwOnError: true,
+            failureContext: $"creating TCP/IP port '{portName}' for printer '{printerName}'");
 
         await RunProcessAsync(
             "powershell.exe",
             $"-NoProfile -ExecutionPolicy Bypass -Command \"try {{ if (-not (Get-Printer -Name '{EscapePowerShell(printerName)}' -ErrorAction SilentlyContinue)) {{ Add-Printer -Name '{EscapePowerShell(printerName)}' -DriverName '{EscapePowerShell(driverName)}' -PortName '{EscapePowerShell(portName)}' -ErrorAction Stop }}; exit 0 }} catch {{ Write-Error $_; exit 1 }}\"",
             logger,
-            cancellationToken);
+            cancellationToken,
+            throwOnError: true,
+            failureContext: $"creating printer '{printerName}'");
 
         if (printer.IsDefault)
         {
@@ -756,7 +763,9 @@ public sealed class RestoreService
         string fileName,
         string arguments,
         RestoreLogger logger,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool throwOnError = false,
+        string? failureContext = null)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -785,6 +794,21 @@ public sealed class RestoreService
         }
 
         logger.Add($"{fileName} exited with code {process.ExitCode}.");
+
+        if (throwOnError && process.ExitCode != 0)
+        {
+            var context = string.IsNullOrWhiteSpace(failureContext)
+                ? $"running {fileName}"
+                : failureContext;
+            var detail = !string.IsNullOrWhiteSpace(stderr)
+                ? stderr.Trim()
+                : !string.IsNullOrWhiteSpace(stdout)
+                    ? stdout.Trim()
+                    : "No additional command output was returned.";
+
+            throw new InvalidOperationException(
+                $"Printer restore failed while {context}. {fileName} exited with code {process.ExitCode}. {detail}");
+        }
     }
 
     private static string EscapePowerShell(string value) => value.Replace("'", "''", StringComparison.Ordinal);
