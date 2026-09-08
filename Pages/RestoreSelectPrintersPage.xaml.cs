@@ -44,6 +44,7 @@ public partial class RestoreSelectPrintersPage : Page
                 IsDefault = printer.IsDefault,
                 DriverName = printer.DriverName,
                 PortName = printer.PortName,
+                HostAddress = printer.HostAddress,
                 IsNetworkPrinter = printer.IsNetworkPrinter,
                 ConnectionPath = printer.ConnectionPath,
                 IsSelected = printer.IsSelected
