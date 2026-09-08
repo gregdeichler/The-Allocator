@@ -1,20 +1,23 @@
 using System.Diagnostics;
 using System.IO;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.Json;
-using Microsoft.Win32;
 using TheAllocator.Models;
 
 namespace TheAllocator.Services;
 
 public sealed class RestoreService
 {
-    public RestoreService(SevenZipService sevenZipService)
+    public RestoreService(SevenZipService sevenZipService, WindowsProfileService windowsProfileService)
     {
         SevenZipService = sevenZipService;
+        WindowsProfileService = windowsProfileService;
     }
 
     public SevenZipService SevenZipService { get; }
+
+    public WindowsProfileService WindowsProfileService { get; }
 
     public async Task<RestorePackageInfo> InspectPackageAsync(
         string archivePath,
@@ -158,10 +161,17 @@ public sealed class RestoreService
             logger.Add($"Restore package: {session.RestorePackagePath}");
             logger.Add($"Target profile path: {targetProfilePath}");
             logger.Add($"Collision mode: {session.RestoreCollisionMode}");
+            logger.Add($"Restore approach: {GetRestoreApproachLogText(session)}");
             logger.Add($"Source operating system: {session.RestoreManifest.SourceOperatingSystem} ({session.RestoreManifest.SourceOperatingSystemVersion})");
             logger.Add($"Target operating system: {MachineInfoService.GetOperatingSystemDisplayName()} ({MachineInfoService.GetOperatingSystemVersionValue()})");
+            logger.Add($"Target profile existed before restore: {Directory.Exists(targetProfilePath)}");
+            logger.Add($"Profile hives plan: {GetProfileHivePlanLogText(session)}");
+            logger.Add($"Windows shell state plan: {GetShellStatePlanLogText(session)}");
             ValidateCrossUserOverwrite(session, logger);
             ValidateTargetProfileIsNotCurrentSignedInProfile(targetProfilePath, logger);
+            var targetIdentity = WindowsProfileService.ResolveRestoreIdentity(session);
+            logger.Add($"Resolved target account SID: {targetIdentity.Sid}");
+            ValidateTargetIdentity(session, targetIdentity, logger);
 
             IProgress<string> progressProxy = new Progress<string>(message =>
             {
@@ -172,11 +182,26 @@ public sealed class RestoreService
                 }
             });
 
-            progressProxy.Report("Preparing target profile folder...");
-            PrepareTargetProfilePath(targetProfilePath, session.RestoreCollisionMode, logger);
+            progressProxy.Report("Validating the backup archive and destination space...");
+            var restorablePaths = session.RestoreManifest.IncludedPaths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Where(ShouldRestoreProfilePath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var uncompressedSize = await SevenZipService.GetArchiveUncompressedSizeAsync(
+                session.RestorePackagePath,
+                cancellationToken,
+                PortableProfilePolicy.GetRestoreExcludePatterns(),
+                restorablePaths);
+            ValidateDestinationSpace(targetProfilePath, uncompressedSize);
+            logger.Add($"Archive file data size: {SizeFormattingService.ToReadableSize(uncompressedSize)}");
+            logger.Add("Archive headers and destination free space passed preflight validation.");
 
-            progressProxy.Report("Applying profile permissions...");
-            await ApplyBasePermissionsAsync(targetProfilePath, session, logger, cancellationToken);
+            progressProxy.Report("Asking Windows to prepare the target profile...");
+            targetProfilePath = PrepareTargetProfile(targetProfilePath, targetIdentity, session.RestoreCollisionMode, logger);
+
+            progressProxy.Report("Preparing access for migrated content...");
+            ApplyBasePermissions(targetProfilePath, targetIdentity, logger);
 
             progressProxy.Report("Extracting files directly into the target profile...");
             var copiedFileCount = await ExtractProfileContentDirectlyAsync(
@@ -188,19 +213,19 @@ public sealed class RestoreService
                 logger,
                 cancellationToken);
 
-            progressProxy.Report("Finalizing profile access...");
-            await ApplyProfileHivePermissionsAsync(targetProfilePath, session, logger, cancellationToken);
-
-            progressProxy.Report("Reconnecting the profile to the target account...");
-            TryBindProfileToAccount(targetProfilePath, session, logger);
+            progressProxy.Report("Validating the Windows profile registration...");
+            WindowsProfileService.ValidateRegisteredProfile(targetIdentity, targetProfilePath);
+            ValidateProfileAccess(targetProfilePath, targetIdentity);
+            logger.Add("Windows profile registration and destination profile hive were validated.");
 
             progressProxy.Report("Restoring selected printers...");
             await RestorePrintersAsync(session, logger, cancellationToken);
 
             logger.Add($"Copied files: {copiedFileCount:N0}");
-            logger.Add($"Restore finished at {DateTime.Now:u}");
+            logger.Add($"Portable data restore finished at {DateTime.Now:u}");
+            logger.Add("Migration validation is pending until the restored user signs in after reboot.");
             telemetry.WriteInfo(
-                "Restore completed successfully.",
+                "Portable data restore completed; user sign-in validation is pending.",
                 phase: "complete",
                 status: "completed",
                 path: targetProfilePath,
@@ -285,6 +310,26 @@ public sealed class RestoreService
             "This restore is targeting the profile that is currently signed in. Sign in with a different local or admin account, then run the restore again.");
     }
 
+    private static void ValidateDestinationSpace(string targetProfilePath, long uncompressedSize)
+    {
+        var rootPath = Path.GetPathRoot(Path.GetFullPath(targetProfilePath));
+        if (string.IsNullOrWhiteSpace(rootPath))
+        {
+            throw new InvalidOperationException("The destination Windows drive could not be determined.");
+        }
+
+        var drive = new DriveInfo(rootPath);
+        var safetyMargin = Math.Max(5L * 1024 * 1024 * 1024, uncompressedSize / 20);
+        var requiredSpace = checked(uncompressedSize + safetyMargin);
+        if (drive.AvailableFreeSpace >= requiredSpace)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The Windows drive does not have enough free space. Restore requires approximately {SizeFormattingService.ToReadableSize(requiredSpace)}, but only {SizeFormattingService.ToReadableSize(drive.AvailableFreeSpace)} is available.");
+    }
+
     private static void ValidateCrossUserOverwrite(AllocatorSession session, RestoreLogger logger)
     {
         var sourceUser = GetComparableAccountName(session.RestoreManifest?.UserName);
@@ -299,6 +344,13 @@ public sealed class RestoreService
             return;
         }
 
+        if (session.RestoreManifest?.IsDomainLinked != session.RestoreUseDomainAccount)
+        {
+            logger.Add("Fresh profile restore was blocked because the source and target account types differ.");
+            throw new InvalidOperationException(
+                "A fresh profile restore requires the same account type as the backup. Choose the domain account for a domain backup, or restore portable files into an existing working profile.");
+        }
+
         if (string.Equals(sourceUser, targetUser, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -306,34 +358,54 @@ public sealed class RestoreService
 
         logger.Add($"Cross-user overwrite restore was blocked. Backup user '{session.RestoreManifest?.UserName}' does not match target user '{session.RestoreTargetUser}'.");
         throw new InvalidOperationException(
-            "Overwrite restore is only allowed when the backup belongs to the same user as the target account. For a different user, use merge instead.");
+            "A Windows-created fresh profile is only available when the backup and target account are the same user. For a different user, restore portable files into that user's existing working profile.");
     }
 
-    private static void PrepareTargetProfilePath(string targetProfilePath, RestoreCollisionMode collisionMode, RestoreLogger logger)
+    private static void ValidateTargetIdentity(
+        AllocatorSession session,
+        WindowsProfileIdentity targetIdentity,
+        RestoreLogger logger)
     {
-        if (!Directory.Exists(targetProfilePath))
-        {
-            if (collisionMode == RestoreCollisionMode.MergeIntoExistingProfile)
-            {
-                logger.Add($"Merge restore was blocked because the target profile folder does not exist: {targetProfilePath}");
-                throw new InvalidOperationException(
-                    "Merge restore requires an existing healthy Windows profile. Sign into the target account once first, or use overwrite restore for a same-user profile rebuild.");
-            }
+        var sourceUser = GetComparableAccountName(session.RestoreManifest?.UserName);
+        var targetUser = GetComparableAccountName(session.RestoreTargetUser);
+        var sameUserName = !string.IsNullOrWhiteSpace(sourceUser) &&
+                           string.Equals(sourceUser, targetUser, StringComparison.OrdinalIgnoreCase);
 
-            Directory.CreateDirectory(targetProfilePath);
-            logger.Add($"Created target profile folder: {targetProfilePath}");
+        if (!sameUserName ||
+            session.RestoreManifest?.IsDomainLinked != true ||
+            !session.RestoreUseDomainAccount ||
+            string.IsNullOrWhiteSpace(session.RestoreManifest.Sid))
+        {
             return;
         }
 
+        if (string.Equals(session.RestoreManifest.Sid, targetIdentity.Sid, StringComparison.OrdinalIgnoreCase))
+        {
+            logger.Add("Target domain SID matches the SID captured in the backup.");
+            return;
+        }
+
+        logger.Add($"Target SID mismatch. Backup SID: {session.RestoreManifest.Sid}; target SID: {targetIdentity.Sid}.");
+        throw new InvalidOperationException(
+            "The selected domain account does not match the account captured in this backup. The restore was stopped before changing the profile.");
+    }
+
+    private string PrepareTargetProfile(
+        string targetProfilePath,
+        WindowsProfileIdentity identity,
+        RestoreCollisionMode collisionMode,
+        RestoreLogger logger)
+    {
         if (collisionMode == RestoreCollisionMode.OverwriteExistingProfile)
         {
-            SafeDeleteDirectory(targetProfilePath);
-            Directory.CreateDirectory(targetProfilePath);
-            logger.Add($"Existing profile folder was removed and recreated: {targetProfilePath}");
-            return;
+            var createdPath = WindowsProfileService.CreateFreshProfile(identity, targetProfilePath);
+            logger.Add($"Windows created and registered a fresh target profile: {createdPath}");
+            return createdPath;
         }
 
-        logger.Add($"Existing profile folder will be merged: {targetProfilePath}");
+        var validatedPath = WindowsProfileService.ValidateExistingProfile(identity, targetProfilePath);
+        logger.Add($"Windows validated the existing working target profile: {validatedPath}");
+        return validatedPath;
     }
 
     private async Task<int> ExtractProfileContentDirectlyAsync(
@@ -349,37 +421,29 @@ public sealed class RestoreService
 
         var includePatterns = manifest.IncludedPaths
             .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Where(path => ShouldRestoreProfilePath(path, session))
+            .Where(ShouldRestoreProfilePath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var skippedHivePaths = manifest.IncludedPaths
+        var skippedPaths = manifest.IncludedPaths
             .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Where(path => !ShouldRestoreProfilePath(path, session))
+            .Where(path => !ShouldRestoreProfilePath(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        foreach (var skippedPath in skippedHivePaths)
+        foreach (var skippedPath in skippedPaths)
         {
             logger.Add($"Skipped sensitive profile state during restore: {skippedPath}");
         }
 
-        if (IsSameUserOverwriteRestore(session) && !IsLegacySourceRestore(session))
-        {
-            logger.Add("Same-user overwrite restore detected. Profile registry hives will be restored.");
-        }
-
-        if (IsLegacySourceRestore(session))
-        {
-            logger.Add("Legacy source operating system detected. Restore will skip profile hives and Windows shell state for compatibility.");
-        }
+        logger.Add("Windows-owned profile hives and machine-specific AppData will not be restored.");
 
         var extractCode = await SevenZipService.ExtractArchiveAsync(
             archivePath,
             targetProfilePath,
             progress,
             cancellationToken,
-            GetLegacyRestoreExcludePatterns(session),
+            PortableProfilePolicy.GetRestoreExcludePatterns(),
             includePatterns);
 
         if (!IsAcceptableSevenZipExitCode(extractCode))
@@ -433,142 +497,43 @@ public sealed class RestoreService
         return restoredFiles;
     }
 
-    private static async Task ApplyBasePermissionsAsync(
+    private static void ApplyBasePermissions(
         string targetProfilePath,
-        AllocatorSession session,
-        RestoreLogger logger,
-        CancellationToken cancellationToken)
+        WindowsProfileIdentity targetIdentity,
+        RestoreLogger logger)
     {
-        var icaclsIdentity = GetIcaclsIdentity(session);
+        var directory = new DirectoryInfo(targetProfilePath);
+        var accessControl = directory.GetAccessControl();
+        var targetSid = new SecurityIdentifier(targetIdentity.Sid);
+        var accessRule = new FileSystemAccessRule(
+            targetSid,
+            FileSystemRights.FullControl,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+            PropagationFlags.None,
+            AccessControlType.Allow);
 
-        await RunProcessAsync(
-            "icacls.exe",
-            $"\"{targetProfilePath}\" /inheritance:e",
-            logger,
-            cancellationToken);
-
-        await RunProcessAsync(
-            "icacls.exe",
-            $"\"{targetProfilePath}\" /grant:r \"Administrators:(OI)(CI)F\"",
-            logger,
-            cancellationToken);
-
-        if (!string.IsNullOrWhiteSpace(icaclsIdentity))
-        {
-            await RunProcessAsync(
-                "icacls.exe",
-                $"\"{targetProfilePath}\" /grant:r \"{icaclsIdentity}:(OI)(CI)F\"",
-                logger,
-                cancellationToken);
-        }
-
-        if (session.RestoreCollisionMode == RestoreCollisionMode.MergeIntoExistingProfile &&
-            Directory.Exists(targetProfilePath))
-        {
-            logger.Add("Existing profile merge selected. Expanding permissions recursively on the target profile to avoid access denied errors during extraction.");
-
-            await RunProcessAsync(
-                "icacls.exe",
-                $"\"{targetProfilePath}\" /grant:r \"Administrators:(OI)(CI)F\" /T /C",
-                logger,
-                cancellationToken);
-
-            if (!string.IsNullOrWhiteSpace(icaclsIdentity))
-            {
-                await RunProcessAsync(
-                    "icacls.exe",
-                    $"\"{targetProfilePath}\" /grant:r \"{icaclsIdentity}:(OI)(CI)F\" /T /C",
-                    logger,
-                    cancellationToken);
-            }
-        }
-
-        logger.Add("Permissions were applied to the target profile folder so restored files inherit access as they are extracted.");
+        accessControl.SetAccessRule(accessRule);
+        directory.SetAccessControl(accessControl);
+        logger.Add($"Applied inheritable access for target SID {targetIdentity.Sid} before extracting migrated content.");
     }
 
-    private static async Task ApplyProfileHivePermissionsAsync(
-        string targetProfilePath,
-        AllocatorSession session,
-        RestoreLogger logger,
-        CancellationToken cancellationToken)
+    private static void ValidateProfileAccess(string targetProfilePath, WindowsProfileIdentity targetIdentity)
     {
-        if (!IsSameUserOverwriteRestore(session))
+        var targetSid = new SecurityIdentifier(targetIdentity.Sid);
+        var accessRules = new DirectoryInfo(targetProfilePath)
+            .GetAccessControl()
+            .GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier));
+
+        var hasAccess = accessRules
+            .OfType<FileSystemAccessRule>()
+            .Any(rule =>
+                rule.AccessControlType == AccessControlType.Allow &&
+                rule.IdentityReference == targetSid &&
+                (rule.FileSystemRights & FileSystemRights.FullControl) == FileSystemRights.FullControl);
+
+        if (!hasAccess)
         {
-            return;
-        }
-
-        var icaclsIdentity = GetIcaclsIdentity(session);
-        if (string.IsNullOrWhiteSpace(icaclsIdentity))
-        {
-            return;
-        }
-
-        var hivePaths = new[]
-        {
-            Path.Combine(targetProfilePath, "NTUSER.DAT"),
-            Path.Combine(targetProfilePath, "AppData", "Local", "Microsoft", "Windows", "UsrClass.dat")
-        };
-
-        foreach (var hivePath in hivePaths.Where(File.Exists))
-        {
-            logger.Add($"Applying explicit access to restored profile hive: {hivePath}");
-
-            await RunProcessAsync(
-                "icacls.exe",
-                $"\"{hivePath}\" /grant:r \"Administrators:F\" \"SYSTEM:F\" \"{icaclsIdentity}:F\" /C",
-                logger,
-                cancellationToken);
-        }
-    }
-
-    private static string GetIcaclsIdentity(AllocatorSession session)
-    {
-        if (string.IsNullOrWhiteSpace(session.RestoreTargetUser))
-        {
-            return string.Empty;
-        }
-
-        if (session.RestoreUseDomainAccount)
-        {
-            return session.RestoreTargetAccountDisplay;
-        }
-
-        return $@"{Environment.MachineName}\{session.RestoreTargetUser}";
-    }
-
-    private static void TryBindProfileToAccount(string targetProfilePath, AllocatorSession session, RestoreLogger logger)
-    {
-        try
-        {
-            var accountName = session.RestoreUseDomainAccount
-                ? session.RestoreTargetAccountDisplay
-                : $@"{Environment.MachineName}\{session.RestoreTargetUser}";
-
-            var sid = (SecurityIdentifier)new NTAccount(accountName).Translate(typeof(SecurityIdentifier));
-            using var profileListKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList", writable: true);
-
-            if (profileListKey?.OpenSubKey($"{sid.Value}.bak") is not null)
-            {
-                profileListKey.DeleteSubKeyTree($"{sid.Value}.bak", throwOnMissingSubKey: false);
-                logger.Add($"Removed stale profile registry backup key for {accountName}.");
-            }
-
-            using var userKey = profileListKey?.CreateSubKey(sid.Value);
-            if (userKey is null)
-            {
-                logger.Add($"Could not open or create the profile registry key for {accountName}.");
-                return;
-            }
-
-            userKey.SetValue("ProfileImagePath", targetProfilePath, RegistryValueKind.ExpandString);
-            userKey.SetValue("Flags", 0, RegistryValueKind.DWord);
-            userKey.SetValue("State", 0, RegistryValueKind.DWord);
-            userKey.SetValue("RefCount", 0, RegistryValueKind.DWord);
-            logger.Add($"Updated profile registry mapping for {accountName}.");
-        }
-        catch (Exception ex)
-        {
-            logger.Add($"Profile registry mapping was skipped: {ex.Message}");
+            throw new InvalidOperationException("The target account access rule could not be verified on the restored profile.");
         }
     }
 
@@ -590,18 +555,14 @@ public sealed class RestoreService
             {
                 await RunProcessAsync(
                     "rundll32.exe",
-                    $"printui.dll,PrintUIEntry /in /n \"{connectionPath}\"",
+                    $"printui.dll,PrintUIEntry /ga /n \"{connectionPath}\"",
                     logger,
                     cancellationToken);
 
                 if (printer.IsDefault)
                 {
-                    await RunProcessAsync(
-                        "powershell.exe",
-                        $"-NoProfile -ExecutionPolicy Bypass -Command \"Set-Printer -Name '{EscapePowerShell(printer.Name)}' -IsDefault $true\"",
-                        logger,
-                        cancellationToken);
-                    }
+                    logger.Add($"Printer '{printer.Name}' was the source default. The restored user must set the default after first sign-in because Windows stores that choice per user.");
+                }
 
                 continue;
             }
@@ -657,11 +618,7 @@ public sealed class RestoreService
 
         if (printer.IsDefault)
         {
-            await RunProcessAsync(
-                "powershell.exe",
-                $"-NoProfile -ExecutionPolicy Bypass -Command \"Set-Printer -Name '{EscapePowerShell(printerName)}' -IsDefault $true\"",
-                logger,
-                cancellationToken);
+            logger.Add($"Printer '{printerName}' was the source default. The restored user must set the default after first sign-in because Windows stores that choice per user.");
         }
     }
 
@@ -887,85 +844,27 @@ public sealed class RestoreService
 
     private static bool IsAcceptableSevenZipExitCode(int exitCode) => exitCode is 0 or 1;
 
-    private static bool ShouldRestoreProfilePath(string relativePath, AllocatorSession session)
+    private static bool ShouldRestoreProfilePath(string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
         {
             return false;
         }
 
-        if (IsProfileHiveLogPath(relativePath))
-        {
-            return false;
-        }
-
-        if (ShouldSkipLegacyShellState(relativePath, session))
-        {
-            return false;
-        }
-
-        if (IsProfileHivePath(relativePath))
-        {
-            return IsSameUserOverwriteRestore(session) && !IsLegacySourceRestore(session);
-        }
-
-        return true;
+        return !PortableProfilePolicy.ShouldExcludeFile(Path.GetFileName(relativePath)) &&
+               !PortableProfilePolicy.IsMachineSpecificPath(relativePath);
     }
 
-    private static bool IsProfileHivePath(string relativePath) =>
-        relativePath.Equals("NTUSER.DAT", StringComparison.OrdinalIgnoreCase) ||
-        relativePath.Equals(Path.Combine("AppData", "Local", "Microsoft", "Windows", "UsrClass.dat"), StringComparison.OrdinalIgnoreCase);
+    private static string GetRestoreApproachLogText(AllocatorSession session) =>
+        session.RestoreCollisionMode == RestoreCollisionMode.OverwriteExistingProfile
+            ? "Ask Windows to create a fresh profile, then restore portable user data."
+            : "Restore files into an existing working profile.";
 
-    private static bool IsProfileHiveLogPath(string relativePath) =>
-        relativePath.StartsWith("NTUSER.DAT.LOG", StringComparison.OrdinalIgnoreCase) ||
-        relativePath.StartsWith("UsrClass.dat.LOG", StringComparison.OrdinalIgnoreCase);
+    private static string GetProfileHivePlanLogText(AllocatorSession session) =>
+        "Keep the destination Windows-created NTUSER.DAT and UsrClass.dat; never restore source profile hives.";
 
-    private static bool IsSameUserOverwriteRestore(AllocatorSession session)
-    {
-        var sourceUser = GetComparableAccountName(session.RestoreManifest?.UserName);
-        var targetUser = GetComparableAccountName(session.RestoreTargetUser);
-
-        return session.RestoreCollisionMode == RestoreCollisionMode.OverwriteExistingProfile &&
-               !string.IsNullOrWhiteSpace(sourceUser) &&
-               !string.IsNullOrWhiteSpace(targetUser) &&
-               string.Equals(sourceUser, targetUser, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsLegacySourceRestore(AllocatorSession session)
-    {
-        var versionValue = session.RestoreManifest?.SourceOperatingSystemVersion;
-        if (Version.TryParse(versionValue, out var parsedVersion))
-        {
-            return parsedVersion.Major < 10;
-        }
-
-        var sourceOperatingSystem = session.RestoreManifest?.SourceOperatingSystem ?? string.Empty;
-        return sourceOperatingSystem.Contains("Windows 7", StringComparison.OrdinalIgnoreCase) ||
-               sourceOperatingSystem.Contains("Windows 8", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool ShouldSkipLegacyShellState(string relativePath, AllocatorSession session)
-    {
-        if (!IsLegacySourceRestore(session))
-        {
-            return false;
-        }
-
-        return relativePath.StartsWith(Path.Combine("AppData", "Local", "Microsoft", "Windows"), StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string[] GetLegacyRestoreExcludePatterns(AllocatorSession session)
-    {
-        if (!IsLegacySourceRestore(session))
-        {
-            return [];
-        }
-
-        return
-        [
-            Path.Combine("AppData", "Local", "Microsoft", "Windows")
-        ];
-    }
+    private static string GetShellStatePlanLogText(AllocatorSession session) =>
+        "Keep destination Windows shell and AppData\\Local state; restore portable data only.";
 
     private static string? GetComparableAccountName(string? accountName)
     {

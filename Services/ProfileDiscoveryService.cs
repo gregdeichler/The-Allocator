@@ -64,11 +64,16 @@ public sealed class ProfileDiscoveryService
 
         foreach (var subKeyName in baseKey.GetSubKeyNames())
         {
+            if (subKeyName.EndsWith(".bak", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             using var subKey = baseKey.OpenSubKey(subKeyName);
             var path = subKey?.GetValue("ProfileImagePath") as string;
             if (!string.IsNullOrWhiteSpace(path))
             {
-                sidMap[path] = subKeyName;
+                sidMap[Environment.ExpandEnvironmentVariables(path)] = subKeyName;
             }
         }
 

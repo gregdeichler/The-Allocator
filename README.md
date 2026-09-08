@@ -10,7 +10,7 @@
 
 - Guided **Old Computer** and **New Computer** workflows
 - Per-user backup packages with sidecar metadata and printer definitions
-- Same-user overwrite restore path validated in real testing
+- Windows-created destination profiles with portable-data restore
 - Built-in reboot step after restore
 - Vassar-specific assumptions for technician use, profile repair, and printer handling
 
@@ -22,8 +22,9 @@ The current application supports:
 - capturing selected printers and profile metadata
 - creating a portable backup package on external storage
 - restoring that package onto a destination machine
-- reconnecting the restored profile to the target Windows account
-- applying profile permissions needed for successful sign-in
+- asking Windows to create or validate the destination profile
+- restoring portable user data without replacing Windows sign-in state
+- applying access to migrated files for the target account
 
 Current backup package layout:
 
@@ -35,16 +36,14 @@ Current backup package layout:
 
 ## Current Status
 
-The Allocator has successfully completed real same-user migration tests:
+Version 1.1.0 is a reliability redesign currently undergoing validation. The restore path now leaves profile hives, Windows shell state, credentials, and machine-specific application data under the destination operating system's control.
 
-- backup completes successfully
-- same-user overwrite restore completes successfully
-- restored users can sign in after reboot
+Testing priorities:
 
-Still being actively hardened:
-
+- successful first sign-in after a clean same-user restore
+- portable user data completeness
 - printer recreation across more device and driver combinations
-- merge restore behavior for already-existing healthy profiles
+- restore into an already-existing healthy profile
 - broader multi-technician and multi-machine testing
 
 ## Technician Workflow
@@ -65,9 +64,9 @@ Still being actively hardened:
 3. Choose `New Computer`.
 4. Select the backup package.
 5. Select the target account.
-6. For same-user rebuild testing, choose `Overwrite`.
+6. For a same-user replacement, let Windows create a fresh profile.
 7. Complete the restore and use the app’s reboot action.
-8. Sign in to the restored account after reboot.
+8. Sign in to the restored account after reboot and confirm the desktop loads.
 
 ## Build
 

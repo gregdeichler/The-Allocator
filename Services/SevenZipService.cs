@@ -184,6 +184,75 @@ public sealed class SevenZipService
         return process.ExitCode;
     }
 
+    public async Task<long> GetArchiveUncompressedSizeAsync(
+        string archivePath,
+        CancellationToken cancellationToken = default,
+        string[]? excludePatterns = null,
+        params string[] includePatterns)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = ExecutablePath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        startInfo.ArgumentList.Add("l");
+        startInfo.ArgumentList.Add("-slt");
+        startInfo.ArgumentList.Add(archivePath);
+
+        foreach (var pattern in includePatterns.Where(pattern => !string.IsNullOrWhiteSpace(pattern)))
+        {
+            startInfo.ArgumentList.Add(pattern);
+        }
+
+        foreach (var excludePattern in (excludePatterns ?? []).Where(pattern => !string.IsNullOrWhiteSpace(pattern)))
+        {
+            startInfo.ArgumentList.Add($"-xr!{excludePattern}");
+        }
+
+        using var process = new Process { StartInfo = startInfo };
+        process.Start();
+
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        long totalSize = 0;
+        while (true)
+        {
+            var line = await process.StandardOutput.ReadLineAsync(cancellationToken);
+            if (line is null)
+            {
+                break;
+            }
+
+            const string sizePrefix = "Size = ";
+            if (line.StartsWith(sizePrefix, StringComparison.Ordinal) &&
+                long.TryParse(line.AsSpan(sizePrefix.Length), out var itemSize))
+            {
+                totalSize += itemSize;
+            }
+        }
+
+        var errorText = await errorTask;
+        await process.WaitForExitAsync(cancellationToken);
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(errorText)
+                    ? $"The backup archive could not be read. 7-Zip returned exit code {process.ExitCode}."
+                    : $"The backup archive could not be read: {errorText.Trim()}");
+        }
+
+        if (totalSize <= 0)
+        {
+            throw new InvalidOperationException("The backup archive did not contain any restorable file data.");
+        }
+
+        return totalSize;
+    }
+
     private async Task<int> RunArchiveCommandAsync(
         string archivePath,
         string workingDirectory,

@@ -12,12 +12,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <TextBlock FontSize="30" FontWeight="Bold" Text="Review and Start Restore" />
+            <TextBlock FontSize="30" FontWeight="Bold" Text="Review Restore Plan" />
             <TextBlock Margin="0,10,0,0"
                        FontSize="16"
                        Foreground="{StaticResource AllocatorMutedBrush}"
                        TextWrapping="Wrap"
-                       Text="Confirm the backup file, the target sign-in account, and how the app should behave if an existing profile is already present." />
+                       Text="Review the account, Windows compatibility, and restore approach before any profile changes are made." />
         </StackPanel>
 
         <Grid Grid.Row="2">
@@ -29,7 +29,7 @@
 
             <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}">
                 <StackPanel>
-                    <TextBlock FontSize="20" FontWeight="Bold" Text="Restore Summary" />
+                    <TextBlock FontSize="20" FontWeight="Bold" Text="Preflight Summary" />
                     <TextBlock x:Name="SummaryText"
                                Margin="0,16,0,0"
                                FontSize="15"
@@ -39,15 +39,30 @@
 
             <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
                 <StackPanel>
-                    <TextBlock FontSize="20" FontWeight="Bold" Text="Existing Profile Behavior" />
+                    <TextBlock FontSize="20" FontWeight="Bold" Text="Restore Approach" />
+                    <TextBlock x:Name="RecommendationText"
+                               Margin="0,12,0,0"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap" />
                     <RadioButton x:Name="MergeRadioButton"
                                  Margin="0,18,0,0"
-                                 Content="Merge into an existing profile if present"
+                                 Content="Restore files into an existing working profile"
                                  Checked="CollisionMode_Checked" />
+                    <TextBlock Margin="26,6,0,0"
+                               FontSize="13"
+                               Foreground="{StaticResource AllocatorMutedBrush}"
+                               TextWrapping="Wrap"
+                               Text="Use only after the target user has signed in successfully and the profile is known to work." />
                     <RadioButton x:Name="OverwriteRadioButton"
-                                 Margin="0,10,0,0"
-                                 Content="Overwrite an existing profile if present"
+                                 Margin="0,16,0,0"
+                                 Content="Let Windows create a fresh profile for this user"
                                  Checked="CollisionMode_Checked" />
+                    <TextBlock Margin="26,6,0,0"
+                               FontSize="13"
+                               Foreground="{StaticResource AllocatorMutedBrush}"
+                               TextWrapping="Wrap"
+                               Text="Best for a clean or reimaged computer. Windows creates the sign-in state before files are restored." />
                 </StackPanel>
             </Border>
         </Grid>

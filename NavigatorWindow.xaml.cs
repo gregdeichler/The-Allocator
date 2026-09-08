@@ -46,9 +46,10 @@ public partial class NavigatorWindow : Window
         MachineInfoService = new MachineInfoService();
         ProfileDiscoveryService = new ProfileDiscoveryService();
         PrinterDiscoveryService = new PrinterDiscoveryService();
+        WindowsProfileService = new WindowsProfileService();
         SevenZipService = new SevenZipService(AppContext.BaseDirectory);
         BackupService = new BackupService(PrinterDiscoveryService, SevenZipService);
-        RestoreService = new RestoreService(SevenZipService);
+        RestoreService = new RestoreService(SevenZipService, WindowsProfileService);
         LoadMachineSummary();
         GoToStartPage();
     }
@@ -60,6 +61,8 @@ public partial class NavigatorWindow : Window
     public ProfileDiscoveryService ProfileDiscoveryService { get; }
 
     public PrinterDiscoveryService PrinterDiscoveryService { get; }
+
+    public WindowsProfileService WindowsProfileService { get; }
 
     public SevenZipService SevenZipService { get; }
 

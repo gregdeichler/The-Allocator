@@ -17,7 +17,7 @@ public partial class RestoreProgressPage : Page
         ProgressText.Text =
             $"Restore package:\n{_shell.Session.RestorePackagePath}\n\n" +
             $"Target account:\n{_shell.Session.RestoreTargetUser}\n\n" +
-            $"Existing profile behavior:\n{_shell.Session.RestoreCollisionMode}\n\n" +
+            $"Restore approach:\n{GetRestoreApproachText()}\n\n" +
             "Preparing restore...";
     }
 
@@ -39,13 +39,14 @@ public partial class RestoreProgressPage : Page
             _shell.Session.RestoreLogPath = result.RestoreLogPath;
             _shell.Session.RestoreTargetProfilePath = result.TargetProfilePath;
             _shell.Session.RestoreCopiedFileCount = result.CopiedFileCount;
-            StatusTitleText.Text = "Restore Complete";
+            StatusTitleText.Text = "Files Restored";
             RestoreProgressBar.IsIndeterminate = false;
             RestoreProgressBar.Value = 100;
             ProgressText.Text =
                 $"Files restored into:\n{result.TargetProfilePath}\n\n" +
                 $"Restore log:\n{result.RestoreLogPath}\n\n" +
-                $"Copied files: {result.CopiedFileCount:N0}";
+                $"Copied files: {result.CopiedFileCount:N0}\n\n" +
+                "Next step: reboot this computer and confirm the restored user can sign in.";
             FinishButton.IsEnabled = true;
             return;
         }
@@ -76,4 +77,9 @@ public partial class RestoreProgressPage : Page
         _shell.Session.RestoreCompletedAt = DateTime.Now;
         _shell.GoToRestoreCompletePage();
     }
+
+    private string GetRestoreApproachText() =>
+        _shell.Session.RestoreCollisionMode == Models.RestoreCollisionMode.OverwriteExistingProfile
+            ? "Let Windows create a fresh profile, then restore portable user data"
+            : "Restore files into an existing working profile";
 }

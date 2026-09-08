@@ -3,6 +3,7 @@ bin/
 obj/
 release/
 packaging/output/
+artifacts/
 
 # Local tooling caches
 .dotnet-cli/
@@ -19,6 +20,11 @@ packaging/output/
 *.log
 *.tmp
 *.cache
+
+# Internal implementation handoffs and working plans
+docs/*handoff*.md
+docs/technician-confidence-plan-*.md
+docs/Release-Notes-v1.0.6.md
 
 # OS files
 Thumbs.db

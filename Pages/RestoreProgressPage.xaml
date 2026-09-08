@@ -13,12 +13,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <TextBlock FontSize="30" FontWeight="Bold" Text="Restore Progress" />
+            <TextBlock FontSize="30" FontWeight="Bold" Text="Restoring Files" />
             <TextBlock Margin="0,10,0,0"
                        FontSize="16"
                        Foreground="{StaticResource AllocatorMutedBrush}"
                        TextWrapping="Wrap"
-                       Text="The app is restoring the backup into the selected profile, repairing access, and reconnecting the selected printers." />
+                       Text="The app is restoring selected profile content, repairing access, reconnecting printers, and preparing the computer for a required reboot." />
         </StackPanel>
 
         <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
@@ -30,7 +30,7 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock x:Name="StatusTitleText" FontSize="20" FontWeight="Bold" Text="Restore Progress" />
+                <TextBlock x:Name="StatusTitleText" FontSize="20" FontWeight="Bold" Text="Restore In Progress" />
                 <ProgressBar Grid.Row="1"
                              x:Name="RestoreProgressBar"
                              Margin="0,16,0,0"
@@ -60,7 +60,7 @@
                     x:Name="FinishButton"
                     Style="{StaticResource PrimaryButtonStyle}"
                     Click="Finish_Click"
-                    Content="Continue To Complete"
+                    Content="Continue"
                     IsEnabled="False" />
         </Grid>
     </Grid>

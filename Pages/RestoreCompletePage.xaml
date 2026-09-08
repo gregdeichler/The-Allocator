@@ -12,12 +12,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0">
-            <TextBlock FontSize="30" FontWeight="Bold" Text="Restore Complete" />
+            <TextBlock FontSize="30" FontWeight="Bold" Text="Files Restored" />
             <TextBlock Margin="0,10,0,0"
                        FontSize="16"
                        Foreground="{StaticResource AllocatorMutedBrush}"
                        TextWrapping="Wrap"
-                       Text="The restore path is complete. Review the summary below before signing into the restored account." />
+                       Text="The file restore is complete. Reboot next, then confirm the restored user can sign in and load the desktop." />
         </StackPanel>
 
         <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
@@ -28,7 +28,7 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock FontSize="20" FontWeight="Bold" Text="Restore Summary" />
+                <TextBlock FontSize="20" FontWeight="Bold" Text="Restore Summary and Next Steps" />
                 <ScrollViewer Grid.Row="2"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"

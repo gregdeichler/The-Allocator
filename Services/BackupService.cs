@@ -14,37 +14,6 @@ public sealed class BackupService
         AttributesToSkip = FileAttributes.ReparsePoint
     };
 
-    private static readonly string[] ExcludedDirectoryNames =
-    [
-        "Temp",
-        "Application Data",
-        "History",
-        "INetCache",
-        "Temporary Internet Files",
-        "CrashDumps",
-        "D3DSCache",
-        "Cache",
-        "Caches",
-        "Code Cache",
-        "GPUCache",
-        "Service Worker",
-        "WindowsApps",
-        "My Music",
-        "My Pictures",
-        "My Videos"
-    ];
-
-    private static readonly string[] ExcludedFilePatterns =
-    [
-        "NTUSER.DAT.LOG",
-        "UsrClass.dat.LOG"
-    ];
-
-    private static readonly string[] ExcludedFileExtensions =
-    [
-        ".search-ms"
-    ];
-
     public BackupService(PrinterDiscoveryService printerDiscoveryService, SevenZipService sevenZipService)
     {
         PrinterDiscoveryService = printerDiscoveryService;
@@ -140,6 +109,8 @@ public sealed class BackupService
             {
                 AppVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0.0",
                 JobId = telemetry.Context.JobId,
+                MigrationPolicyVersion = 2,
+                ContentPolicy = "Portable user data and AppData Roaming; Windows profile hives and machine-specific app state excluded.",
                 CreatedAt = DateTime.Now,
                 SourceComputerName = Environment.MachineName,
                 SourceOperatingSystem = MachineInfoService.GetOperatingSystemDisplayName(),
@@ -167,7 +138,7 @@ public sealed class BackupService
                 archivePath,
                 profile.ProfilePath,
                 includedPaths,
-                GetExcludeArguments(),
+                PortableProfilePolicy.GetBackupExcludeArguments(),
                 progressProxy,
                 cancellationToken);
             if (!IsAcceptableSevenZipExitCode(archiveExitCode) &&
@@ -335,6 +306,7 @@ public sealed class BackupService
     }
 
     private static int CountIncludedFiles(
+        string profileRoot,
         string sourcePath,
         List<string> excludedPaths,
         List<string> messages,
@@ -348,7 +320,7 @@ public sealed class BackupService
             foreach (var filePath in Directory.EnumerateFiles(sourcePath, "*", ProfileEnumerationOptions))
             {
                 var fileName = Path.GetFileName(filePath);
-                if (ShouldExcludeFile(fileName))
+                if (PortableProfilePolicy.ShouldExcludeFile(fileName))
                 {
                     excludedPaths.Add(filePath);
                     filesSkipped++;
@@ -361,14 +333,14 @@ public sealed class BackupService
             foreach (var childDirectory in Directory.EnumerateDirectories(sourcePath, "*", ProfileEnumerationOptions))
             {
                 var directoryName = Path.GetFileName(childDirectory);
-                if (ShouldExcludeDirectory(childDirectory, directoryName))
+                if (PortableProfilePolicy.ShouldExcludeDirectory(profileRoot, childDirectory, directoryName))
                 {
                     excludedPaths.Add(childDirectory);
                     filesSkipped++;
                     continue;
                 }
 
-                fileCount += CountIncludedFiles(childDirectory, excludedPaths, messages, telemetry, ref filesSkipped);
+                fileCount += CountIncludedFiles(profileRoot, childDirectory, excludedPaths, messages, telemetry, ref filesSkipped);
             }
         }
         catch (UnauthorizedAccessException)
@@ -404,7 +376,7 @@ public sealed class BackupService
             foreach (var filePath in Directory.EnumerateFiles(profilePath, "*", ProfileEnumerationOptions))
             {
                 var fileName = Path.GetFileName(filePath);
-                if (ShouldExcludeFile(fileName))
+                if (PortableProfilePolicy.ShouldExcludeFile(fileName))
                 {
                     excludedPaths.Add(filePath);
                     filesSkipped++;
@@ -418,7 +390,7 @@ public sealed class BackupService
             foreach (var directoryPath in Directory.EnumerateDirectories(profilePath, "*", ProfileEnumerationOptions))
             {
                 var directoryName = Path.GetFileName(directoryPath);
-                if (ShouldExcludeDirectory(directoryPath, directoryName))
+                if (PortableProfilePolicy.ShouldExcludeDirectory(profilePath, directoryPath, directoryName))
                 {
                     excludedPaths.Add(directoryPath);
                     filesSkipped++;
@@ -426,7 +398,7 @@ public sealed class BackupService
                 }
 
                 includedPaths.Add(directoryName);
-                copiedFileCount += CountIncludedFiles(directoryPath, excludedPaths, messages, telemetry, ref filesSkipped);
+                copiedFileCount += CountIncludedFiles(profilePath, directoryPath, excludedPaths, messages, telemetry, ref filesSkipped);
             }
         }
         catch (UnauthorizedAccessException)
@@ -447,62 +419,6 @@ public sealed class BackupService
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
-
-    private static List<string> GetExcludeArguments()
-    {
-        var arguments = new List<string>();
-
-        foreach (var directoryName in ExcludedDirectoryNames)
-        {
-            arguments.Add($"-xr!{directoryName}");
-        }
-
-        foreach (var pattern in ExcludedFilePatterns)
-        {
-            arguments.Add($"-x!{pattern}*");
-        }
-
-        foreach (var extension in ExcludedFileExtensions)
-        {
-            arguments.Add($"-x!*{extension}");
-        }
-
-        arguments.Add(@"-xr!LocalCache");
-        arguments.Add(@"-xr!WindowsApps");
-        arguments.Add(@"-xr!Application Data");
-        arguments.Add(@"-xr!History");
-        arguments.Add(@"-x!AppData\Local\Microsoft\WindowsApps\*");
-        return arguments;
-    }
-
-    private static bool ShouldExcludeDirectory(string fullPath, string directoryName)
-    {
-        try
-        {
-            var attributes = File.GetAttributes(fullPath);
-            if ((attributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
-            {
-                return true;
-            }
-        }
-        catch
-        {
-            return true;
-        }
-
-        if (ExcludedDirectoryNames.Contains(directoryName, StringComparer.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return (fullPath.Contains(@"\Packages\", StringComparison.OrdinalIgnoreCase)
-                && fullPath.EndsWith(@"\LocalCache", StringComparison.OrdinalIgnoreCase)) ||
-               fullPath.Contains(@"\AppData\Local\Microsoft\WindowsApps", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool ShouldExcludeFile(string fileName) =>
-        ExcludedFilePatterns.Any(pattern => fileName.StartsWith(pattern, StringComparison.OrdinalIgnoreCase)) ||
-        ExcludedFileExtensions.Any(extension => fileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
 
     private static bool IsAcceptableSevenZipExitCode(int exitCode) => exitCode is 0 or 1;
 

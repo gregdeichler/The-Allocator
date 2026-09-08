@@ -8,6 +8,10 @@ public sealed class BackupManifest
 
     public string JobId { get; set; } = string.Empty;
 
+    public int MigrationPolicyVersion { get; set; } = 1;
+
+    public string ContentPolicy { get; set; } = string.Empty;
+
     public DateTime CreatedAt { get; set; }
 
     public string SourceComputerName { get; set; } = string.Empty;
