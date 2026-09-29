@@ -30,5 +30,22 @@ jobs:
       - name: Build The Allocator
         run: dotnet build TheAllocator.csproj --configuration Release
 
+      - name: Build WinUI technician console
+        run: dotnet build TheAllocator.WinUI/TheAllocator.WinUI.csproj --configuration Release -p:Platform=x64
+
       - name: Run restore safety regression tests
         run: dotnet run --project tests/TheAllocator.RegressionTests/TheAllocator.RegressionTests.csproj --configuration Release
+
+      - name: Run WinUI view-model tests
+        run: dotnet run --project tests/TheAllocator.WinUI.Tests/TheAllocator.WinUI.Tests.csproj --configuration Release -p:Platform=x64
+
+      - name: Publish unpackaged WinUI application
+        shell: pwsh
+        run: dotnet publish TheAllocator.WinUI/TheAllocator.WinUI.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -o artifacts/winui
+
+      - name: Verify release payload
+        shell: pwsh
+        run: |
+          if (-not (Test-Path artifacts/winui/TheAllocator.exe)) { throw "TheAllocator.exe was not published." }
+          if (-not (Test-Path artifacts/winui/tools/7zip/x64/7za.exe)) { throw "7-Zip payload was not published." }
+          if (-not (Test-Path artifacts/winui/Assets/TheAllocator.ico)) { throw "Application assets were not published." }

@@ -64,6 +64,53 @@ var tests = new (string Name, Action Body)[]
     {
         Contains("RestoreIdentityPolicy.EnsureSidMatches", windowsProfileSource);
         False(windowsProfileSource.Contains("CreateIdentityFromSid(", StringComparison.Ordinal));
+    }),
+
+    ("workflow stages cannot be skipped", () =>
+    {
+        var coordinator = new WorkflowCoordinator();
+        coordinator.Start(WorkflowMode.Backup);
+        False(coordinator.TryNavigate(WorkflowStage.Transfer));
+        Equal(WorkflowStage.Setup, coordinator.Stage);
+    }),
+
+    ("workflow locks navigation during transfer", () =>
+    {
+        var coordinator = new WorkflowCoordinator();
+        coordinator.Start(WorkflowMode.Restore);
+        coordinator.ShowReview();
+        coordinator.BeginTransfer();
+        True(coordinator.IsLocked);
+        False(coordinator.TryNavigate(WorkflowStage.Setup));
+        coordinator.Complete();
+        False(coordinator.IsLocked);
+        Equal(WorkflowStage.Finish, coordinator.Stage);
+    }),
+
+    ("failed transfer returns to review", () =>
+    {
+        var coordinator = new WorkflowCoordinator();
+        coordinator.Start(WorkflowMode.Backup);
+        coordinator.ShowReview();
+        coordinator.BeginTransfer();
+        coordinator.ReturnToReviewAfterFailure();
+        Equal(WorkflowStage.Review, coordinator.Stage);
+        True(coordinator.CanNavigateTo(WorkflowStage.Setup));
+    }),
+
+    ("typed backup progress maps stable phases", () =>
+    {
+        var progress = OperationProgressMapper.FromBackupMessage("Phase 2 of 3: Adding backup details...");
+        Equal(WorkflowMode.Backup, progress.Operation);
+        Equal(OperationPhase.Metadata, progress.Phase);
+        True(progress.Fraction > 0.6);
+    }),
+
+    ("typed restore progress hides raw implementation as headline", () =>
+    {
+        var progress = OperationProgressMapper.FromRestoreMessage("Extracting files directly into the target profile...");
+        Equal(OperationPhase.Extracting, progress.Phase);
+        Equal("Restoring profile files", progress.Headline);
     })
 };
 

@@ -6,7 +6,7 @@ using TheAllocator.Models;
 
 namespace TheAllocator.Services;
 
-public sealed class BackupService
+public sealed class BackupService : IBackupService
 {
     private static readonly EnumerationOptions ProfileEnumerationOptions = new()
     {
@@ -303,6 +303,17 @@ public sealed class BackupService
         {
             SafeDeleteDirectory(metadataTempRoot, messages);
         }
+    }
+
+    async Task<BackupResult> IBackupService.CreateBackupAsync(
+        AllocatorSession session,
+        IProgress<OperationProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var legacyProgress = progress is null
+            ? null
+            : new Progress<string>(message => progress.Report(OperationProgressMapper.FromBackupMessage(message)));
+        return await CreateBackupAsync(session, legacyProgress, cancellationToken);
     }
 
     private static int CountIncludedFiles(

@@ -7,7 +7,7 @@ using TheAllocator.Models;
 
 namespace TheAllocator.Services;
 
-public sealed class RestoreService
+public sealed class RestoreService : IRestoreService
 {
     public RestoreService(SevenZipService sevenZipService, WindowsProfileService windowsProfileService)
     {
@@ -260,6 +260,17 @@ public sealed class RestoreService
                 Messages = logger.Messages
             };
         }
+    }
+
+    async Task<RestoreResult> IRestoreService.RestoreAsync(
+        AllocatorSession session,
+        IProgress<OperationProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var legacyProgress = progress is null
+            ? null
+            : new Progress<string>(message => progress.Report(OperationProgressMapper.FromRestoreMessage(message)));
+        return await RestoreAsync(session, legacyProgress, cancellationToken);
     }
 
     private static async Task<T?> ReadJsonAsync<T>(string path, CancellationToken cancellationToken)

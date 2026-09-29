@@ -36,7 +36,7 @@ Current backup package layout:
 
 ## Current Status
 
-Version 1.1.0 is a reliability redesign currently undergoing validation. The restore path now leaves profile hives, Windows shell state, credentials, and machine-specific application data under the destination operating system's control.
+Version 2.0.0 introduces a WinUI 3 technician console with four consistent stages: Setup, Review, Transfer, and Finish. The prior WPF project remains buildable during field validation, while release packaging now targets the new unpackaged, self-contained WinUI application. The restore path continues to leave profile hives, Windows shell state, credentials, and machine-specific application data under the destination operating system's control.
 
 Testing priorities:
 
@@ -73,16 +73,20 @@ Testing priorities:
 From PowerShell:
 
 ```powershell
-& 'C:\Program Files\dotnet\dotnet.exe' publish '.\TheAllocator.csproj' -c Release -r win-x64 --self-contained true -o '.\release\TheAllocator-test'
+& 'C:\Program Files\dotnet\dotnet.exe' publish '.\TheAllocator.WinUI\TheAllocator.WinUI.csproj' -c Release -r win-x64 --self-contained true -p:Platform=x64 -o '.\release\TheAllocator-test'
 ```
 
 Published executable:
 
 - `release\TheAllocator-test\TheAllocator.exe`
 
+The fallback WPF application remains buildable from `TheAllocator.csproj` during the 2.0 field-validation period.
+
 ## Tech Stack
 
-- .NET 10 WPF desktop app
+- .NET 10 WinUI 3 desktop app using Windows App SDK 2.5.1
+- unpackaged, self-contained x64 deployment with administrator elevation
+- shared migration core retained by the fallback WPF project during validation
 - bundled 7-Zip command-line tooling for archive creation and extraction
 - Windows-native profile, ACL, registry, and printer operations
 
