@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
         Bindings.Update();
         VersionMenuItem.Text = ViewModel.VersionLabel;
         ViewModel.RebootRequested += RebootRequested;
+        ViewModel.AbandonSetupRequested += AbandonSetupRequested;
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
@@ -111,5 +112,21 @@ public sealed partial class MainWindow : Window
 
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
             ViewModel.RebootNow();
+    }
+
+    private async void AbandonSetupRequested(object? sender, EventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = RootGrid.XamlRoot,
+            Title = "Discard this migration setup?",
+            Content = "The selected profile, destination, account, package, and printer choices will be cleared.",
+            PrimaryButtonText = "Discard setup",
+            CloseButtonText = "Keep editing",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            ViewModel.ConfirmStartOver();
     }
 }

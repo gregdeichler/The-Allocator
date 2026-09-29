@@ -9,7 +9,10 @@ var tests = new (string Name, Func<Task> Body)[]
     ("setup selections survive review navigation", SetupStateSurvivesBackNavigation),
     ("empty profile state is actionable", EmptyProfilesShowNotice),
     ("picker cancellation keeps restore setup unchanged", PickerCancellationIsSafe),
-    ("valid package inspection populates restore state", PackageInspectionPopulatesState)
+    ("invalid package inspection shows inline recovery", PackageInspectionFailureIsInline),
+    ("valid package inspection populates restore state", PackageInspectionPopulatesState),
+    ("blocked preflight disables transfer", BlockedPreflightDisablesTransfer),
+    ("entered setup requires discard confirmation", EnteredSetupRequiresConfirmation)
 };
 
 var failures = new List<string>();
@@ -102,6 +105,46 @@ static async Task PackageInspectionPopulatesState()
     True(viewModel.IsPackageLoaded);
     Equal("alex", viewModel.ManualTargetUser);
     Equal(1, viewModel.RestorePrinters.Count);
+}
+
+static async Task PackageInspectionFailureIsInline()
+{
+    var services = FakeServices.Empty();
+    services.Picker.PackagePath = @"C:\Backups\broken.7z";
+    services.Restore.Package = new RestorePackageInfo { ErrorMessage = "Archive metadata is missing." };
+    var viewModel = new MainViewModel(services);
+    viewModel.StartRestoreCommand.Execute(null);
+    await viewModel.BrowsePackageCommand.ExecuteAsync(null);
+    False(viewModel.IsPackageLoaded);
+    True(viewModel.IsNoticeOpen);
+    Equal("Backup package problem", viewModel.NoticeTitle);
+}
+
+static Task BlockedPreflightDisablesTransfer()
+{
+    var viewModel = new MainViewModel(FakeServices.WithProfile());
+    viewModel.StartBackupCommand.Execute(null);
+    viewModel.SelectedBackupProfile = viewModel.BackupProfiles[0];
+    viewModel.BackupDestination = Path.GetTempPath();
+    viewModel.ContinueToReviewCommand.Execute(null);
+    False(viewModel.CanBeginTransfer);
+    True(viewModel.PreflightChecks.Any(check => check.Status == PreflightStatus.Blocked));
+    return Task.CompletedTask;
+}
+
+static Task EnteredSetupRequiresConfirmation()
+{
+    var viewModel = new MainViewModel(FakeServices.WithProfile());
+    var confirmationRequested = false;
+    viewModel.AbandonSetupRequested += (_, _) => confirmationRequested = true;
+    viewModel.StartBackupCommand.Execute(null);
+    viewModel.SelectedBackupProfile = viewModel.BackupProfiles[0];
+    viewModel.StartOverCommand.Execute(null);
+    True(confirmationRequested);
+    Equal(WorkflowMode.Backup, viewModel.Mode);
+    viewModel.ConfirmStartOver();
+    Equal(WorkflowMode.None, viewModel.Mode);
+    return Task.CompletedTask;
 }
 
 static void Equal<T>(T expected, T actual)

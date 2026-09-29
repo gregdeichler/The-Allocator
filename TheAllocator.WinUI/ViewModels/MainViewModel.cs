@@ -43,6 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public event EventHandler? RebootRequested;
+    public event EventHandler? AbandonSetupRequested;
 
     public ObservableCollection<ProfileOption> BackupProfiles { get; } = [];
     public ObservableCollection<ProfileOption> RestoreProfiles { get; } = [];
@@ -200,9 +201,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        _coordinator.Reset();
-        SyncWorkflowState();
-        IsNoticeOpen = false;
+        RequestStartOver();
     }
 
     [RelayCommand]
@@ -331,11 +330,39 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void StartOver()
     {
+        if (Stage is WorkflowStage.Setup or WorkflowStage.Review && HasEnteredSetupData())
+        {
+            AbandonSetupRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        ResetToHome();
+    }
+
+    public void ConfirmStartOver() => ResetToHome();
+
+    private void RequestStartOver()
+    {
+        if (HasEnteredSetupData())
+        {
+            AbandonSetupRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        ResetToHome();
+    }
+
+    private void ResetToHome()
+    {
         _coordinator.Reset();
         _session = new AllocatorSession();
         IsNoticeOpen = false;
         SyncWorkflowState();
     }
+
+    private bool HasEnteredSetupData() => IsBackup
+        ? SelectedBackupProfile is not null || !string.IsNullOrWhiteSpace(BackupDestination) || BackupPrinters.Any(printer => printer.IsSelected)
+        : IsPackageLoaded || !string.IsNullOrWhiteSpace(RestorePackagePath) || !string.IsNullOrWhiteSpace(ManualTargetUser) || RestorePrinters.Any(printer => printer.IsSelected);
 
     [RelayCommand]
     private void OpenResultFolder() => _shell.OpenFolder(ResultPath);
