@@ -13,16 +13,41 @@ public partial class App : Application
 
     public App()
     {
+        UnhandledException += App_UnhandledException;
         InitializeComponent();
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        SetThreadExecutionState(ExecutionState.Continuous | ExecutionState.SystemRequired | ExecutionState.DisplayRequired);
-        _ = TelemetryService.FlushWellKnownPendingBatchesAsync();
-        _window = new MainWindow();
-        _window.Closed += Window_Closed;
-        _window.Activate();
+        try
+        {
+            SetThreadExecutionState(ExecutionState.Continuous | ExecutionState.SystemRequired | ExecutionState.DisplayRequired);
+            _ = TelemetryService.FlushWellKnownPendingBatchesAsync();
+            _window = new MainWindow();
+            _window.Closed += Window_Closed;
+            _window.Activate();
+        }
+        catch (Exception ex)
+        {
+            WriteStartupFailure(ex);
+            throw;
+        }
+    }
+
+    private static void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e) =>
+        WriteStartupFailure(e.Exception);
+
+    private static void WriteStartupFailure(Exception exception)
+    {
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(AppContext.BaseDirectory, "startup-error.log"),
+                $"[{DateTime.Now:u}]{Environment.NewLine}{exception}");
+        }
+        catch
+        {
+        }
     }
 
     private void Window_Closed(object sender, WindowEventArgs args)

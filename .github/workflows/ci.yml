@@ -61,3 +61,31 @@ jobs:
           if (-not (Test-Path artifacts/winui/TheAllocator.exe)) { throw "TheAllocator.exe was not published." }
           if (-not (Test-Path artifacts/winui/tools/7zip/x64/7za.exe)) { throw "7-Zip payload was not published." }
           if (-not (Test-Path artifacts/winui/Assets/TheAllocator.ico)) { throw "Application assets were not published." }
+
+      - name: Launch published WinUI application
+        shell: pwsh
+        run: |
+          $process = Start-Process artifacts/winui/TheAllocator.exe -WorkingDirectory artifacts/winui -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(20)
+            do {
+              Start-Sleep -Milliseconds 500
+              $process.Refresh()
+            } while (-not $process.HasExited -and $process.MainWindowHandle -eq 0 -and (Get-Date) -lt $deadline)
+
+            if ($process.HasExited) {
+              if (Test-Path artifacts/winui/startup-error.log) {
+                Get-Content artifacts/winui/startup-error.log
+              }
+              throw "The published WinUI application exited during startup with code $($process.ExitCode)."
+            }
+
+            if ($process.MainWindowHandle -eq 0) {
+              throw "The published WinUI application did not create a main window."
+            }
+          }
+          finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+            }
+          }
