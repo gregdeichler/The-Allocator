@@ -108,10 +108,10 @@ public sealed partial class MainViewModel : ObservableObject
     public partial OperationSeverity NoticeSeverity { get; set; } = OperationSeverity.Information;
 
     [ObservableProperty]
-    public partial string ProgressHeadline { get; set; } = "Preparing the migration";
+    public partial string ProgressHeadline { get; set; } = "Preparing";
 
     [ObservableProperty]
-    public partial string ProgressDetail { get; set; } = "The Allocator is getting ready.";
+    public partial string ProgressDetail { get; set; } = "Starting the operation.";
 
     [ObservableProperty]
     public partial double ProgressValue { get; set; }
@@ -161,7 +161,7 @@ public sealed partial class MainViewModel : ObservableObject
         ? "Choose the Windows profile, optional printers, and destination for this backup."
         : "Inspect the backup package, choose the sign-in account, and select any printers to recreate.";
     public string ReviewTitle => IsBackup ? "Review the backup plan" : "Review the restore plan";
-    public string ReviewDescription => "Resolve any blocked checks before starting. Warnings can be reviewed without exposing raw logs.";
+    public string ReviewDescription => "Fix blocked items before starting.";
     public string TransferTitle => IsBackup ? "Creating the backup" : "Restoring the profile";
 
     partial void OnSelectedBackupProfileChanged(ProfileOption? value) => NotifyCanContinue();
@@ -274,7 +274,7 @@ public sealed partial class MainViewModel : ObservableObject
             PackageSummary = $"{package.Manifest.DisplayName} ({package.Manifest.UserName}) · {package.Manifest.SourceComputerName} · " +
                 $"{package.Manifest.SourceOperatingSystem} · created {package.Manifest.CreatedAt:g}";
             IsPackageLoaded = true;
-            ShowNotice("Package ready", "The backup metadata passed inspection.", OperationSeverity.Success);
+            ShowNotice("Package loaded", "Backup metadata loaded.", OperationSeverity.Success);
         }
         catch (Exception ex)
         {
@@ -309,7 +309,7 @@ public sealed partial class MainViewModel : ObservableObject
         IsNoticeOpen = false;
         _operationStartedAt = DateTime.Now;
         ProgressMilestones.Clear();
-        ProgressHeadline = "Preparing the migration";
+        ProgressHeadline = "Preparing";
         ProgressDetail = "The operation has started. Keep this computer connected to power and storage.";
         IsProgressIndeterminate = true;
         ProgressValue = 0;
@@ -505,7 +505,7 @@ public sealed partial class MainViewModel : ObservableObject
         ResultPath = result.ArchivePath;
         ResultLogPath = result.LogPath;
         FinishTitle = "Backup complete";
-        FinishMessage = $"The package is ready to move to the new computer. {result.CopiedFileCount:N0} files were archived ({SizeFormattingService.ToReadableSize(result.ArchiveSizeBytes)}).";
+        FinishMessage = $"{result.CopiedFileCount:N0} files were archived ({SizeFormattingService.ToReadableSize(result.ArchiveSizeBytes)}).";
         CompleteSuccessfully();
     }
 

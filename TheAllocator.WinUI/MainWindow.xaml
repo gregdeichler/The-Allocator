@@ -68,9 +68,9 @@
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel MaxWidth="1120" Margin="48,40,48,48" Spacing="28">
                     <StackPanel Spacing="8">
-                        <TextBlock Text="Move a Windows profile with confidence"
+                        <TextBlock Text="Windows profile transfer"
                                    Style="{StaticResource PageTitleStyle}" />
-                        <TextBlock Text="Choose the role of this computer. The Allocator will guide the technician through setup, safety checks, transfer, and handoff."
+                        <TextBlock Text="Choose what this computer will do."
                                    FontSize="16"
                                    Style="{StaticResource BodyMutedStyle}"
                                    MaxWidth="760"
@@ -96,13 +96,13 @@
                                 </Border>
                                 <StackPanel Grid.Row="1" Margin="0,20,0,0" Spacing="8">
                                     <TextBlock Text="Back up an old computer" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="Capture a user’s portable files, profile details, and selected printers to external storage."
+                                    <TextBlock Text="Back up a user profile and selected printers to external storage."
                                                Style="{StaticResource BodyMutedStyle}" FontSize="15" />
                                 </StackPanel>
                                 <StackPanel Grid.Row="2" Margin="0,24,0,24" Spacing="8">
-                                    <TextBlock Text="1  Choose the user and destination" />
-                                    <TextBlock Text="2  Review readiness checks" />
-                                    <TextBlock Text="3  Create and verify the package" />
+                                    <TextBlock Text="1  Select the user and destination" />
+                                    <TextBlock Text="2  Review the backup" />
+                                    <TextBlock Text="3  Create the backup" />
                                 </StackPanel>
                                 <Button Grid.Row="3"
                                         HorizontalAlignment="Left"
@@ -126,13 +126,13 @@
                                 </Border>
                                 <StackPanel Grid.Row="1" Margin="0,20,0,0" Spacing="8">
                                     <TextBlock Text="Restore onto a new computer" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="Inspect a backup, validate the target account, restore portable data, and prepare for first sign-in."
+                                    <TextBlock Text="Restore a backup to a Windows account and reinstall selected printers."
                                                Style="{StaticResource BodyMutedStyle}" FontSize="15" />
                                 </StackPanel>
                                 <StackPanel Grid.Row="2" Margin="0,24,0,24" Spacing="8">
-                                    <TextBlock Text="1  Inspect the backup package" />
-                                    <TextBlock Text="2  Confirm account and compatibility" />
-                                    <TextBlock Text="3  Restore and verify the profile" />
+                                    <TextBlock Text="1  Select the backup" />
+                                    <TextBlock Text="2  Select the target account" />
+                                    <TextBlock Text="3  Restore the files" />
                                 </StackPanel>
                                 <Button Grid.Row="3"
                                         HorizontalAlignment="Left"
@@ -185,7 +185,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="{x:Bind ViewModel.WorkflowName, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="1" Margin="0,6,0,20" Text="Four guided stages" Style="{StaticResource BodyMutedStyle}" />
+                        <TextBlock Grid.Row="1" Margin="0,6,0,20" Text="Steps" Style="{StaticResource BodyMutedStyle}" />
                         <ItemsControl Grid.Row="2" ItemsSource="{x:Bind ViewModel.Steps}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="viewModels:WorkflowStepItem">
@@ -425,7 +425,7 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Style="{StaticResource CardBorderStyle}">
                                         <StackPanel Spacing="14">
-                                            <TextBlock Text="Migration summary" Style="{StaticResource SectionTitleStyle}" />
+                                            <TextBlock Text="Summary" Style="{StaticResource SectionTitleStyle}" />
                                             <ItemsControl ItemsSource="{x:Bind ViewModel.SummaryRows}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="viewModels:SummaryRow">
@@ -440,7 +440,7 @@
                                     </Border>
                                     <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
                                         <StackPanel Spacing="14">
-                                            <TextBlock Text="Readiness checks" Style="{StaticResource SectionTitleStyle}" />
+                                            <TextBlock Text="Checks" Style="{StaticResource SectionTitleStyle}" />
                                             <ItemsControl ItemsSource="{x:Bind ViewModel.PreflightChecks}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="models:PreflightCheck">
