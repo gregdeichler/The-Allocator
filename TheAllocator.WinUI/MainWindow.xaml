@@ -221,7 +221,7 @@
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Center"
                                 Command="{x:Bind ViewModel.StartOverCommand}"
-                                IsEnabled="{x:Bind ViewModel.IsTransferActive, Mode=OneWay, Converter={StaticResource InverseBooleanConverter}}"
+                                IsEnabled="{Binding IsTransferActive, Mode=OneWay, Converter={StaticResource InverseBooleanConverter}}"
                                 Content="Back to start" />
                     </Grid>
                 </Border>
@@ -266,7 +266,7 @@
                              IsOpen="{x:Bind ViewModel.IsNoticeOpen, Mode=TwoWay}"
                              Title="{x:Bind ViewModel.NoticeTitle, Mode=OneWay}"
                              Message="{x:Bind ViewModel.NoticeMessage, Mode=OneWay}"
-                             Severity="{x:Bind ViewModel.NoticeSeverity, Mode=OneWay, Converter={StaticResource NoticeSeverityConverter}}"
+                             Severity="{Binding NoticeSeverity, Mode=OneWay, Converter={StaticResource NoticeSeverityConverter}}"
                              IsClosable="True" />
 
                     <Grid Grid.Row="1">
@@ -313,7 +313,7 @@
                                                     </ListView.ItemTemplate>
                                                 </ListView>
                                                 <TextBlock Text="No installed printers were found. You can continue without printers."
-                                                           Visibility="{x:Bind ViewModel.BackupPrinters.Count, Mode=OneWay, Converter={StaticResource ZeroToVisibilityConverter}}"
+                                                           Visibility="{Binding BackupPrinters.Count, Mode=OneWay, Converter={StaticResource ZeroToVisibilityConverter}}"
                                                            Style="{StaticResource BodyMutedStyle}" />
                                             </StackPanel>
                                         </Border>
@@ -449,7 +449,7 @@
                                                                 <ColumnDefinition Width="28" />
                                                                 <ColumnDefinition Width="*" />
                                                             </Grid.ColumnDefinitions>
-                                                            <FontIcon Glyph="{x:Bind Status, Converter={StaticResource PreflightGlyphConverter}}" FontSize="16" AutomationProperties.Name="{x:Bind Status}" />
+                                                            <FontIcon Glyph="{Binding Status, Converter={StaticResource PreflightGlyphConverter}}" FontSize="16" AutomationProperties.Name="{x:Bind Status}" />
                                                             <StackPanel Grid.Column="1" Spacing="3">
                                                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                                                     <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" TextWrapping="Wrap" />

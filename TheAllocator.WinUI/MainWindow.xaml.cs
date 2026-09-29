@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
         ViewModel = new MainViewModel(new AppServices(windowHandle));
+        RootGrid.DataContext = ViewModel;
         Bindings.Update();
         VersionMenuItem.Text = ViewModel.VersionLabel;
         ViewModel.RebootRequested += RebootRequested;
