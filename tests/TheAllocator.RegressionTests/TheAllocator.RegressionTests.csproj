@@ -7,9 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Models\BackupPrinterInfo.cs" Link="Source\BackupPrinterInfo.cs" />
-    <Compile Include="..\..\Services\PortableProfilePolicy.cs" Link="Source\PortableProfilePolicy.cs" />
-    <Compile Include="..\..\Services\PrinterPortAddressPolicy.cs" Link="Source\PrinterPortAddressPolicy.cs" />
-    <Compile Include="..\..\Services\RestoreIdentityPolicy.cs" Link="Source\RestoreIdentityPolicy.cs" />
+    <ProjectReference Include="..\..\TheAllocator.Core.csproj" />
   </ItemGroup>
 </Project>

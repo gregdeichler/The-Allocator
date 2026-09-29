@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.0.0"
+    [string]$Version = "2.0.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,7 +23,7 @@ $env:DOTNET_CLI_HOME = Join-Path $projectRoot ".dotnet-cli"
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
 
-& "C:\Program Files\dotnet\dotnet.exe" publish (Join-Path $projectRoot "TheAllocator.csproj") -c Release -r win-x64 --self-contained true -o $appOut
+& "C:\Program Files\dotnet\dotnet.exe" publish (Join-Path $projectRoot "TheAllocator.WinUI\TheAllocator.WinUI.csproj") -c Release -r win-x64 --self-contained true -p:Platform=x64 -o $appOut
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed."
 }
@@ -63,6 +63,8 @@ $sourceKeep = @(
     "NuGet.Config",
     "README.md",
     "TheAllocator.csproj",
+    "TheAllocator.Core.csproj",
+    "TheAllocator.WinUI",
     "Assets",
     "docs",
     "Models",

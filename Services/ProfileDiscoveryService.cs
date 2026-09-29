@@ -4,7 +4,7 @@ using TheAllocator.Models;
 
 namespace TheAllocator.Services;
 
-public sealed class ProfileDiscoveryService
+public sealed class ProfileDiscoveryService : IProfileDiscoveryService
 {
     private static readonly HashSet<string> ExcludedProfiles = new(StringComparer.OrdinalIgnoreCase)
     {

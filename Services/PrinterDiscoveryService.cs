@@ -1,10 +1,10 @@
-using System.Printing;
+using System.Management;
 using Microsoft.Win32;
 using TheAllocator.Models;
 
 namespace TheAllocator.Services;
 
-public sealed class PrinterDiscoveryService
+public sealed class PrinterDiscoveryService : IPrinterDiscoveryService
 {
     private const string StandardTcpIpPortsRegistryPath = @"SYSTEM\CurrentControlSet\Control\Print\Monitors\Standard TCP/IP Port\Ports";
 
@@ -12,19 +12,16 @@ public sealed class PrinterDiscoveryService
     {
         try
         {
-            var server = new LocalPrintServer();
-            var defaultPrinterName = server.DefaultPrintQueue?.Name ?? string.Empty;
-
-            return server
-                .GetPrintQueues([
-                    EnumeratedPrintQueueTypes.Local,
-                    EnumeratedPrintQueueTypes.Connections
-                ])
-                .OrderBy(queue => queue.Name)
-                .Select(queue => new PrinterOption
+            return ReadInstalledPrinters()
+                .Select(printer => new PrinterOption
                 {
-                    Name = queue.Name,
-                    IsDefault = string.Equals(queue.Name, defaultPrinterName, StringComparison.OrdinalIgnoreCase),
+                    Name = printer.Name,
+                    IsDefault = printer.IsDefault,
+                    DriverName = printer.DriverName,
+                    PortName = printer.PortName,
+                    HostAddress = GetTcpIpHostAddress(printer.PortName),
+                    IsNetworkPrinter = printer.IsNetworkPrinter,
+                    ConnectionPath = printer.ConnectionPath,
                     IsSelected = true
                 })
                 .ToList();
@@ -49,29 +46,17 @@ public sealed class PrinterDiscoveryService
 
         try
         {
-            var server = new LocalPrintServer();
-            var defaultPrinterName = server.DefaultPrintQueue?.Name ?? string.Empty;
-
-            return server
-                .GetPrintQueues([
-                    EnumeratedPrintQueueTypes.Local,
-                    EnumeratedPrintQueueTypes.Connections
-                ])
-                .Where(queue => selectedNames.Contains(queue.Name))
-                .OrderBy(queue => queue.Name)
-                .Select(queue =>
+            return ReadInstalledPrinters()
+                .Where(printer => selectedNames.Contains(printer.Name))
+                .Select(printer => new BackupPrinterInfo
                 {
-                    var portName = queue.QueuePort?.Name ?? string.Empty;
-                    return new BackupPrinterInfo
-                    {
-                        Name = queue.Name,
-                        IsDefault = string.Equals(queue.Name, defaultPrinterName, StringComparison.OrdinalIgnoreCase),
-                        DriverName = queue.QueueDriver?.Name ?? string.Empty,
-                        PortName = portName,
-                        HostAddress = GetTcpIpHostAddress(portName),
-                        IsNetworkPrinter = portName.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase) || queue.Name.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase),
-                        ConnectionPath = queue.Name.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase) ? queue.Name : string.Empty
-                    };
+                    Name = printer.Name,
+                    IsDefault = printer.IsDefault,
+                    DriverName = printer.DriverName,
+                    PortName = printer.PortName,
+                    HostAddress = GetTcpIpHostAddress(printer.PortName),
+                    IsNetworkPrinter = printer.IsNetworkPrinter,
+                    ConnectionPath = printer.ConnectionPath
                 })
                 .ToList();
         }
@@ -95,6 +80,36 @@ public sealed class PrinterDiscoveryService
                 })
                 .ToList();
         }
+    }
+
+    private static IReadOnlyList<InstalledPrinter> ReadInstalledPrinters()
+    {
+        using var searcher = new ManagementObjectSearcher(
+            "SELECT Name, DriverName, PortName, Default, Network FROM Win32_Printer");
+        using var results = searcher.Get();
+        var printers = new List<InstalledPrinter>();
+
+        foreach (ManagementObject result in results)
+        {
+            using (result)
+            {
+                var name = result["Name"]?.ToString()?.Trim() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                var portName = result["PortName"]?.ToString()?.Trim() ?? string.Empty;
+                var isNetwork = result["Network"] is bool network && network ||
+                    name.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase) ||
+                    portName.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase);
+                printers.Add(new InstalledPrinter(
+                    name,
+                    result["DriverName"]?.ToString()?.Trim() ?? string.Empty,
+                    portName,
+                    result["Default"] is bool isDefault && isDefault,
+                    isNetwork,
+                    name.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase) ? name : string.Empty));
+            }
+        }
+
+        return printers.OrderBy(printer => printer.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static string GetTcpIpHostAddress(string portName)
@@ -130,4 +145,12 @@ public sealed class PrinterDiscoveryService
             ? inferred
             : string.Empty;
     }
+
+    private sealed record InstalledPrinter(
+        string Name,
+        string DriverName,
+        string PortName,
+        bool IsDefault,
+        bool IsNetworkPrinter,
+        string ConnectionPath);
 }

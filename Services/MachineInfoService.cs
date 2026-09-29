@@ -4,8 +4,11 @@ using TheAllocator.Models;
 
 namespace TheAllocator.Services;
 
-public sealed class MachineInfoService
+public sealed class MachineInfoService : IMachineInfoService
 {
+    string IMachineInfoService.OperatingSystemDisplayName => GetOperatingSystemDisplayName();
+
+    string IMachineInfoService.OperatingSystemVersion => GetOperatingSystemVersionValue();
     public static string GetOperatingSystemDisplayName()
     {
         try

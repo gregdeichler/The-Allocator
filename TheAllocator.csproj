@@ -21,6 +21,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Models\**\*.cs" />
+    <Compile Remove="Services\**\*.cs" />
+    <Compile Remove="TheAllocator.WinUI\**\*.cs" />
     <Compile Remove="AllocatorShell.xaml.cs" />
     <Compile Remove="MainWindow.xaml.cs" />
     <Compile Remove="release\**\*.cs" />
@@ -33,6 +36,7 @@
     <Page Remove="obj\**\*.xaml" />
     <Page Remove="bin\**\*.xaml" />
     <Page Remove="tests\**\*.xaml" />
+    <Page Remove="TheAllocator.WinUI\**\*.xaml" />
     <EmbeddedResource Remove="release\**\*" />
     <EmbeddedResource Remove="obj\**\*" />
     <EmbeddedResource Remove="bin\**\*" />
@@ -41,6 +45,11 @@
     <None Remove="obj\**\*" />
     <None Remove="bin\**\*" />
     <None Remove="tests\**\*" />
+    <None Remove="TheAllocator.WinUI\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="TheAllocator.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

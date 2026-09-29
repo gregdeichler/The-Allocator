@@ -12,6 +12,7 @@ public sealed class WindowsProfileService
 {
     private const string ProfileListRegistryPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList";
     private const int ErrorAlreadyExists = 183;
+    private const int MaxPath = 260;
 
     public WindowsProfileIdentity ResolveRestoreIdentity(AllocatorSession session)
     {
@@ -76,7 +77,7 @@ public sealed class WindowsProfileService
 
         RemoveStaleBackupRegistration(identity.Sid);
 
-        var profilePath = new StringBuilder(512);
+        var profilePath = new StringBuilder(MaxPath);
         var result = CreateProfile(identity.Sid, identity.UserName, profilePath, (uint)profilePath.Capacity);
         if (result != 0)
         {
@@ -200,8 +201,11 @@ public sealed class WindowsProfileService
 
     [DllImport("userenv.dll", EntryPoint = "CreateProfile", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
     private static extern int CreateProfile(
+        [MarshalAs(UnmanagedType.LPWStr)]
         string pszUserSid,
+        [MarshalAs(UnmanagedType.LPWStr)]
         string pszUserName,
+        [Out, MarshalAs(UnmanagedType.LPWStr)]
         StringBuilder pszProfilePath,
         uint cchProfilePath);
 
