@@ -31,7 +31,19 @@ jobs:
         run: dotnet build TheAllocator.csproj --configuration Release
 
       - name: Build WinUI technician console
-        run: dotnet build TheAllocator.WinUI/TheAllocator.WinUI.csproj --configuration Release -p:Platform=x64
+        shell: pwsh
+        run: |
+          dotnet build TheAllocator.WinUI/TheAllocator.WinUI.csproj --configuration Release -p:Platform=x64
+          $buildExitCode = $LASTEXITCODE
+          if ($buildExitCode -ne 0) {
+            $generated = Get-ChildItem TheAllocator.WinUI/obj -Recurse -Filter MainWindow.g.cs | Select-Object -First 1
+            if ($generated) {
+              $lines = Get-Content $generated.FullName
+              $start = [Math]::Max(0, [Math]::Min(3780, $lines.Count - 1))
+              $lines | Select-Object -Skip $start -First 100
+            }
+            exit $buildExitCode
+          }
 
       - name: Run restore safety regression tests
         run: dotnet run --project tests/TheAllocator.RegressionTests/TheAllocator.RegressionTests.csproj --configuration Release
