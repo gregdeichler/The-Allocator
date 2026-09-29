@@ -354,7 +354,7 @@
                                             </StackPanel>
                                         </Border>
                                         <Border Style="{StaticResource CardBorderStyle}">
-                                            <StackPanel Spacing="12" IsEnabled="{x:Bind ViewModel.IsPackageLoaded, Mode=OneWay}">
+                                            <StackPanel Spacing="12" IsHitTestVisible="{x:Bind ViewModel.IsPackageLoaded, Mode=OneWay}">
                                                 <TextBlock Text="2. Target account" Style="{StaticResource SectionTitleStyle}" />
                                                 <TextBlock Text="Use an existing working profile, or enter the account Windows should prepare for this restore." Style="{StaticResource BodyMutedStyle}" />
                                                 <RadioButton Content="Use an existing account" GroupName="AccountMode" IsChecked="{x:Bind ViewModel.UseExistingAccount, Mode=OneWay}" Checked="ExistingAccount_Checked" />
@@ -373,7 +373,7 @@
                                             </StackPanel>
                                         </Border>
                                         <Border Style="{StaticResource CardBorderStyle}">
-                                            <StackPanel Spacing="12" IsEnabled="{x:Bind ViewModel.IsPackageLoaded, Mode=OneWay}">
+                                            <StackPanel Spacing="12" IsHitTestVisible="{x:Bind ViewModel.IsPackageLoaded, Mode=OneWay}">
                                                 <TextBlock Text="3. Printers (optional)" Style="{StaticResource SectionTitleStyle}" />
                                                 <TextBlock Text="Select saved printers to recreate after profile files are restored." Style="{StaticResource BodyMutedStyle}" />
                                                 <ListView ItemsSource="{x:Bind ViewModel.RestorePrinters}" MaxHeight="220" SelectionMode="None">
