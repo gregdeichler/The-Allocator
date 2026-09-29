@@ -66,6 +66,13 @@ var tests = new (string Name, Action Body)[]
         False(windowsProfileSource.Contains("CreateIdentityFromSid(", StringComparison.Ordinal));
     }),
 
+    ("profile creation uses the Windows MAX_PATH buffer", () =>
+    {
+        Contains("private const int MaxPath = 260;", windowsProfileSource);
+        Contains("new StringBuilder(MaxPath)", windowsProfileSource);
+        False(windowsProfileSource.Contains("new StringBuilder(512)", StringComparison.Ordinal));
+    }),
+
     ("workflow stages cannot be skipped", () =>
     {
         var coordinator = new WorkflowCoordinator();
