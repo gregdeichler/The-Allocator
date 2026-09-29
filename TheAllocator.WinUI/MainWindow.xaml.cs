@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
         _appWindow = AppWindow.GetFromWindowId(windowId);
         ViewModel = new MainViewModel(new AppServices(windowHandle));
         Bindings.Update();
+        VersionMenuItem.Text = ViewModel.VersionLabel;
         ViewModel.RebootRequested += RebootRequested;
 
         ExtendsContentIntoTitleBar = true;
@@ -88,6 +89,12 @@ public sealed partial class MainWindow : Window
     private void ExistingAccount_Checked(object sender, RoutedEventArgs e) => ViewModel.UseExistingAccount = true;
 
     private void ManualAccount_Checked(object sender, RoutedEventArgs e) => ViewModel.UseExistingAccount = false;
+
+    private void DiagnosticsFlyout_Opening(object sender, object e) =>
+        OpenLatestLogMenuItem.IsEnabled = ViewModel.ShowOpenLogAction;
+
+    private void OpenLatestLog_Click(object sender, RoutedEventArgs e) =>
+        ViewModel.OpenResultLogCommand.Execute(null);
 
     private async void RebootRequested(object? sender, EventArgs e)
     {

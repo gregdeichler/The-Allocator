@@ -48,12 +48,14 @@
                     AutomationProperties.Name="Diagnostics and application information">
                 <FontIcon Glyph="&#xE712;" />
                 <Button.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedRight">
-                        <MenuFlyoutItem Text="Open latest log"
-                                        IsEnabled="{x:Bind ViewModel.ShowOpenLogAction, Mode=OneWay}"
-                                        Command="{x:Bind ViewModel.OpenResultLogCommand}" />
+                    <MenuFlyout x:Name="DiagnosticsFlyout"
+                                Placement="BottomEdgeAlignedRight"
+                                Opening="DiagnosticsFlyout_Opening">
+                        <MenuFlyoutItem x:Name="OpenLatestLogMenuItem"
+                                        Text="Open latest log"
+                                        Click="OpenLatestLog_Click" />
                         <MenuFlyoutSeparator />
-                        <MenuFlyoutItem Text="{x:Bind ViewModel.VersionLabel}" IsEnabled="False" />
+                        <MenuFlyoutItem x:Name="VersionMenuItem" IsEnabled="False" />
                     </MenuFlyout>
                 </Button.Flyout>
             </Button>

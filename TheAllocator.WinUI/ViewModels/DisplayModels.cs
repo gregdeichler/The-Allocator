@@ -16,16 +16,16 @@ public sealed partial class WorkflowStepItem : ObservableObject
     public string Title { get; }
 
     [ObservableProperty]
-    private string stateLabel = "Upcoming";
+    public partial string StateLabel { get; set; } = "Upcoming";
 
     [ObservableProperty]
-    private string glyph = "\uE915";
+    public partial string Glyph { get; set; } = "\uE915";
 
     [ObservableProperty]
-    private bool isCurrent;
+    public partial bool IsCurrent { get; set; }
 
     [ObservableProperty]
-    private bool isAvailable;
+    public partial bool IsAvailable { get; set; }
 }
 
 public sealed record SummaryRow(string Label, string Value);

@@ -62,76 +62,76 @@ public sealed partial class MainViewModel : ObservableObject
     public WorkflowStage Stage => _coordinator.Stage;
 
     [ObservableProperty]
-    private ProfileOption? selectedBackupProfile;
+    public partial ProfileOption? SelectedBackupProfile { get; set; }
 
     [ObservableProperty]
-    private ProfileOption? selectedRestoreProfile;
+    public partial ProfileOption? SelectedRestoreProfile { get; set; }
 
     [ObservableProperty]
-    private string backupDestination = string.Empty;
+    public partial string BackupDestination { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string restorePackagePath = string.Empty;
+    public partial string RestorePackagePath { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string manualTargetUser = string.Empty;
+    public partial string ManualTargetUser { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private bool useExistingAccount;
+    public partial bool UseExistingAccount { get; set; }
 
     [ObservableProperty]
-    private bool useDomainAccount = true;
+    public partial bool UseDomainAccount { get; set; } = true;
 
     [ObservableProperty]
-    private bool isPackageLoaded;
+    public partial bool IsPackageLoaded { get; set; }
 
     [ObservableProperty]
-    private string packageSummary = "Choose a backup package to inspect its source and contents.";
+    public partial string PackageSummary { get; set; } = "Choose a backup package to inspect its source and contents.";
 
     [ObservableProperty]
-    private bool isBusy;
+    public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
-    private bool isTransferActive;
+    public partial bool IsTransferActive { get; set; }
 
     [ObservableProperty]
-    private bool isNoticeOpen;
+    public partial bool IsNoticeOpen { get; set; }
 
     [ObservableProperty]
-    private string noticeTitle = string.Empty;
+    public partial string NoticeTitle { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string noticeMessage = string.Empty;
+    public partial string NoticeMessage { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private OperationSeverity noticeSeverity = OperationSeverity.Information;
+    public partial OperationSeverity NoticeSeverity { get; set; } = OperationSeverity.Information;
 
     [ObservableProperty]
-    private string progressHeadline = "Preparing the migration";
+    public partial string ProgressHeadline { get; set; } = "Preparing the migration";
 
     [ObservableProperty]
-    private string progressDetail = "The Allocator is getting ready.";
+    public partial string ProgressDetail { get; set; } = "The Allocator is getting ready.";
 
     [ObservableProperty]
-    private double progressValue;
+    public partial double ProgressValue { get; set; }
 
     [ObservableProperty]
-    private bool isProgressIndeterminate = true;
+    public partial bool IsProgressIndeterminate { get; set; } = true;
 
     [ObservableProperty]
-    private string elapsedText = "Elapsed time: 0:00";
+    public partial string ElapsedText { get; set; } = "Elapsed time: 0:00";
 
     [ObservableProperty]
-    private string finishTitle = "Migration complete";
+    public partial string FinishTitle { get; set; } = "Migration complete";
 
     [ObservableProperty]
-    private string finishMessage = string.Empty;
+    public partial string FinishMessage { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string resultPath = string.Empty;
+    public partial string ResultPath { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string resultLogPath = string.Empty;
+    public partial string ResultLogPath { get; set; } = string.Empty;
 
     public bool IsHomeVisible => Mode == WorkflowMode.None;
     public bool IsWorkflowVisible => Mode != WorkflowMode.None;
